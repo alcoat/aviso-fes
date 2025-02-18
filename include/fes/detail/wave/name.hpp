@@ -57,8 +57,12 @@ constexpr const char* const kM11 = "M11";
 constexpr const char* const kM12 = "M12";
 /// @brief M13
 constexpr const char* const kM13 = "M13";
+/// @brief MA2
+constexpr const char* const kMA2 = "MA2";
 /// @brief M2
 constexpr const char* const kM2 = "M2";
+/// @brief MB2
+constexpr const char* const kMB2 = "MB2";
 /// @brief M3
 constexpr const char* const kM3 = "M3";
 /// @brief M4

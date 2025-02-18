@@ -44,8 +44,12 @@ auto name(Constituent constituent) -> const char* {
       return detail::wave::name::kN2;
     case kNu2:
       return detail::wave::name::kNu2;
+    case kMA2:
+      return detail::wave::name::kMA2;
     case kM2:
       return detail::wave::name::kM2;
+    case kMB2:
+      return detail::wave::name::kMB2;
     case kL2:
       return detail::wave::name::kL2;
     case kT2:

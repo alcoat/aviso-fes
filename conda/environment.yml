@@ -19,3 +19,12 @@ dependencies:
   - sphinx-gallery
   - matplotlib
   - cartopy
+#
+  - python=3.11
+  - poetry
+  - requests
+  - xarray
+  - pint
+  - click
+  - geopandas
+  - shapely

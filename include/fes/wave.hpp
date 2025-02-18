@@ -726,6 +726,22 @@ class Nu2 : public Wave {
              &angle::Astronomic::f_m2) {}
 };
 
+/// @brief @f$MA_2@f$
+///
+/// <table>
+/// <tr><th>V</th><th>u</th><th>Factor-f</th></tr>
+/// <tr><td>@f$2T - 2s + 1h@f$</td>
+/// <td>@f$+2\xi - 2\nu@f$</td>
+/// <td>@f$f(M_2)@f$</td></tr>
+/// </table>
+/// @note Schureman: %Table 2, Page 165, Ref. A39
+class MA2 : public Wave {
+ public:
+  constexpr MA2()
+      : Wave(kMA2, kShortPeriod, false, 2, -2, 1, 0, 0, 0, 0, 2, -2, 0, 0,
+             &angle::Astronomic::f_m2) {}
+};
+
 /// @brief @f$M_2@f$
 ///
 /// <table>
@@ -739,6 +755,22 @@ class M2 : public Wave {
  public:
   constexpr M2()
       : Wave(kM2, kShortPeriod, false, 2, -2, 2, 0, 0, 0, 0, 2, -2, 0, 0,
+             &angle::Astronomic::f_m2) {}
+};
+
+/// @brief @f$MB_2@f$
+///
+/// <table>
+/// <tr><th>V</th><th>u</th><th>Factor-f</th></tr>
+/// <tr><td>@f$2T - 2s + 3h@f$</td>
+/// <td>@f$+2\xi - 2\nu@f$</td>
+/// <td>@f$f(M_2)@f$</td></tr>
+/// </table>
+/// @note Schureman: %Table 2, Page 165, Ref. A39
+class MB2 : public Wave {
+ public:
+  constexpr MB2()
+      : Wave(kMB2, kShortPeriod, false, 2, -2, 3, 0, 0, 0, 0, 2, -2, 0, 0,
              &angle::Astronomic::f_m2) {}
 };
 
