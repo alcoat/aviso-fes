@@ -212,8 +212,14 @@ auto parse(const std::string& name) -> Constituent {
   if (iequals(name, wave::name::kNu2)) {
     return kNu2;
   }
+  if (iequals(name, wave::name::kMA2)) {
+    return kMA2;
+  }
   if (iequals(name, wave::name::kM2)) {
     return kM2;
+  }
+  if (iequals(name, wave::name::kMB2)) {
+    return kMB2;
   }
   if (iequals(name, wave::name::kL2)) {
     return kL2;
