@@ -58,6 +58,7 @@ void init_constituent(py::module& m) {
       .value("kMO3", fes::kMO3, ":math:`MO_{3}`")
       .value("k2MK3", fes::k2MK3, ":math:`2MK_{3}`")
       .value("kM3", fes::kM3, ":math:`M_{3}`")
+      .value("kS3", fes::kS3, ":math:`S_{3}`")
       .value("kMK3", fes::kMK3, ":math:`MK_{3}`")
       .value("kN4", fes::kN4, ":math:`N_{4}`")
       .value("kMN4", fes::kMN4, ":math:`MN_{4}`")

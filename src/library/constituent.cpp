@@ -102,6 +102,8 @@ auto name(Constituent constituent) -> const char* {
       return detail::wave::name::kOO1;
     case kM3:
       return detail::wave::name::kM3;
+    case kS3:
+      return detail::wave::name::kS3;
     case kM6:
       return detail::wave::name::kM6;
     case kMN4:
@@ -298,6 +300,9 @@ auto parse(const std::string& name) -> Constituent {
   }
   if (iequals(name, wave::name::kM3)) {
     return kM3;
+  }
+  if (iequals(name, wave::name::kS3)) {
+    return kS3;
   }
   if (iequals(name, wave::name::kM6)) {
     return kM6;

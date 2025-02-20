@@ -225,6 +225,13 @@ class Astronomic {
     return (2.0 / 3.0 - detail::math::pow<2>(std::sin(i_))) * factor;
   }
 
+  /// @brief Gets the node factor of @2f$M_2@f$.
+  ///
+  /// @return @f$2*f(M_2)@f$
+  constexpr auto f_2m2() const noexcept -> double {
+    return 2*f_m2();
+  }
+
   /// @brief Gets the node factor of @f$M_2^2@f$.
   ///
   /// @return @f$f(M_2)^2@f$

@@ -1015,6 +1015,21 @@ class MK3 : public Wave {
              &angle::Astronomic::f_m2_k1) {}
 };
 
+/// @brief @f$S_3@f$
+///
+/// <table>
+/// <tr><th>V</th><th>u</th><th>Factor-f</th></tr>
+/// <tr><td>@f$2T@f$</td>
+/// <td>@f$0@f$</td>
+/// <td>@f$1@f$</td></tr>
+/// </table>
+class S3 : public Wave {
+ public:
+  constexpr S3()
+      : Wave(kS3, kShortPeriod, false, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+             &angle::Astronomic::f_2m2) {}
+};
+
 /// @brief @f$N_4 = N_2 + N_2@f$
 ///
 /// <table>

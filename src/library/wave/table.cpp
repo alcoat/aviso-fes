@@ -92,6 +92,8 @@ auto Table::wave_factory(const Constituent ident) -> std::shared_ptr<Wave> {
       return std::shared_ptr<Wave>(new wave::OO1());
     case kM3:
       return std::shared_ptr<Wave>(new wave::M3());
+    case kS3:
+      return std::shared_ptr<Wave>(new wave::S3());
     case kM6:
       return std::shared_ptr<Wave>(new wave::M6());
     case kMN4:
