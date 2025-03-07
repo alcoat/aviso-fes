@@ -1,4 +1,4 @@
-# Copyright (c) 2024 CNES
+# Copyright (c) 2025 CNES
 #
 # All rights reserved. Use of this source code is governed by a
 # BSD-style license that can be found in the LICENSE file.
@@ -14,7 +14,7 @@ from . import core
 from .core import Formulae
 
 if TYPE_CHECKING:
-    from .typing import (
+    from .type_hints import (
         VectorComplex128,
         VectorDateTime64,
         VectorFloat64,

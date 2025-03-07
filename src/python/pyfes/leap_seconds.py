@@ -1,4 +1,4 @@
-# Copyright (c) 2024 CNES
+# Copyright (c) 2025 CNES
 #
 # All rights reserved. Use of this source code is governed by a
 # BSD-style license that can be found in the LICENSE file.
@@ -24,7 +24,7 @@ import numpy
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from .typing import (
+    from .type_hints import (
         NDArrayStructured,
         VectorDateTime64,
         VectorInt64,
@@ -183,7 +183,10 @@ def get_leap_seconds(
     if numpy.any(date_before_1972):
         warnings.warn(
             'Leap seconds are not defined before January 1, 1972. '
-            'Setting them to zero.', UserWarning)
+            'Setting them to zero.',
+            category=UserWarning,
+            stacklevel=2,
+        )
 
     table = _load_leap_second_file()
     index = numpy.searchsorted(table['utc'], utc, side='right', sorter=sorter)

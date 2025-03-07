@@ -1,4 +1,4 @@
-// Copyright (c) 2024 CNES
+// Copyright (c) 2025 CNES
 //
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
@@ -13,6 +13,7 @@
 #include <utility>
 #include <vector>
 
+#include "fes/geometry/box.hpp"
 #include "fes/geometry/ecef.hpp"
 #include "fes/geometry/point.hpp"
 #include "fes/geometry/triangle.hpp"
@@ -95,6 +96,13 @@ class Index : public std::enable_shared_from_this<Index> {
       -> Eigen::Matrix<int32_t, -1, 3> const& {
     return triangles_;
   }
+
+  /// @brief Get the indices of the triangles that intersect the bounding box.
+  ///
+  /// @param[in] bbox The bounding box.
+  /// @return The indices of the triangles that intersect the bounding box.
+  auto selected_triangles(const geometry::Box& bbox) const
+      -> std::vector<int64_t>;
 
   /// @brief Get a string representation of the index state.
   ///

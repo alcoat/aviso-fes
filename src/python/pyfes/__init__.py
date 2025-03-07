@@ -1,4 +1,4 @@
-# Copyright (c) 2024 CNES
+# Copyright (c) 2025 CNES
 #
 # All rights reserved. Use of this source code is governed by a
 # BSD-style license that can be found in the LICENSE file.
@@ -16,7 +16,7 @@ from .version import __version__
 from .wave_table import WaveDict, WaveTable
 
 if TYPE_CHECKING:
-    from .typing import VectorDateTime64, VectorFloat64, VectorInt8
+    from .type_hints import VectorDateTime64, VectorFloat64, VectorInt8
 
 __all__ = [
     'AstronomicAngle',
