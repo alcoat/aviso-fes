@@ -13,9 +13,11 @@ First, we import the required modules.
 from __future__ import annotations
 
 import pathlib
-import numpy
-import matplotlib.pyplot
+
 import netCDF4
+import numpy
+
+import matplotlib.pyplot
 import pyfes
 
 # %%
@@ -94,4 +96,3 @@ matplotlib.pyplot.plot(time, h, label='Original')
 matplotlib.pyplot.plot(time, h - h_tide, label='Corrected height')
 matplotlib.pyplot.legend()
 matplotlib.pyplot.show()
-
