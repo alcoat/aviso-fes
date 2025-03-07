@@ -14,10 +14,10 @@ from __future__ import annotations
 
 import pathlib
 
+import matplotlib.pyplot
 import netCDF4
 import numpy
 
-import matplotlib.pyplot
 import pyfes
 
 # %%
@@ -48,7 +48,7 @@ print(pyfes.constituents.known())
 # If you want to restrict the analysis to only a few components, you must
 # provide a list to the constructor in order to specify the waves to be
 # analyzed.
-#wt = pyfes.WaveTable([
+# wt = pyfes.WaveTable([
 #    'Mm', 'Mf', 'Mtm', 'Msqm', '2Q1', 'Sigma1', 'Q1', 'Rho1', 'O1', 'MP1',
 #    'M11', 'M12', 'M13', 'Chi1', 'Pi1', 'P1', 'S1', 'K1', 'Psi1', 'Phi1',
 #    'Theta1', 'J1', 'OO1', 'MNS2', 'Eps2', '2N2', 'Mu2', '2MS2', 'N2', 'Nu2',
@@ -56,7 +56,7 @@ print(pyfes.constituents.known())
 #    'Eta2', '2SM2', 'MO3', '2MK3', 'M3', 'MK3', 'N4', 'MN4', 'M4', 'SN4',
 #    'MS4', 'MK4', 'S4', 'SK4', 'R4', '2MN6', 'M6', 'MSN6', '2MS6', '2MK6',
 #    '2SM6', 'MSK6', 'S6', 'M8', 'MSf', 'Ssa', 'Sa'
-#])
+# ])
 
 # %%
 # The :py:meth:`pyfes.WaveTable.keys <pyfes.core.WaveTable.keys>` method
