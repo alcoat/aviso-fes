@@ -1027,7 +1027,7 @@ class S3 : public Wave {
  public:
   constexpr S3()
       : Wave(kS3, kShortPeriod, false, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-             &angle::Astronomic::f_2m2) {}
+             &angle::Astronomic::f_m22) {}
 };
 
 /// @brief @f$N_4 = N_2 + N_2@f$
