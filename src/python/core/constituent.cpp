@@ -21,9 +21,10 @@ void init_constituent(py::module& m) {
       .value("kRho1", fes::kRho1, ":math:`\\rho_{1}`")
       .value("kO1", fes::kO1, ":math:`O_{1}`")
       .value("kMP1", fes::kMP1, ":math:`MP_{1}`")
-      .value("kM11", fes::kM11, ":math:`M_{11}`")
-      .value("kM12", fes::kM12, ":math:`M_{12}`")
-      .value("kM13", fes::kM13, ":math:`M_{13}`")
+      .value("kM1", fes::kM1, ":math:`M1`")
+      .value("kM11", fes::kM11, ":math:`M1_{1}`")
+      .value("kM12", fes::kM12, ":math:`M1_{2}`")
+      .value("kM13", fes::kM13, ":math:`M1_{3}`")
       .value("kChi1", fes::kChi1, ":math:`\\chi_{1}`")
       .value("kPi1", fes::kPi1, ":math:`\\pi_{1}`")
       .value("kP1", fes::kP1, ":math:`P_{1}`")
@@ -89,6 +90,8 @@ void init_constituent(py::module& m) {
       .value("kMf1", fes::kMf1, ":math:`Mf_{1}`")
       .value("kMf2", fes::kMf2, ":math:`Mf_{2}`")
       .value("kM0", fes::kM0, ":math:`M_{0}`")
+      .value("kN2P", fes::kN2P, ":math:`N2_{P}`")
+      .value("kL2P", fes::kL2P, ":math:`L2_{P}`")
       .export_values();
 
   m.def_submodule("constituents", "Constituent names.")
