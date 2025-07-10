@@ -19,6 +19,7 @@ def test_constructor():
     wt = core.WaveTable()
     assert len(wt) == 79
     assert len([item for item in wt]) == 79
+    assert wt.find('M2') == wt[core.kM2]
     assert wt.find('m2') == wt[core.kM2]
     assert wt.find('M2') != wt[core.kK1]
     with pytest.raises(ValueError):
