@@ -29,6 +29,11 @@ distributed by AVISO, with support from CNES (http://www.aviso.altimetry.fr/)*
 The documentation of the FES2022 software is available on the readthedocs
 platform: https://cnes.github.io/aviso-fes/
 
+# CONSTITUENTS
+
+The tidal constituents used in this software are listed in the
+[CONSTITUENTS.md](CONSTITUENTS.md) file.
+
 # LEGACY C VERSION
 
 The legacy C version of the FES software is available on his own branch:
@@ -41,9 +46,9 @@ The reference version to compute the FES2022b tidal solution is
 
 # BIBLIOGRAPHY
 
-* Lyard, F. H., Carrere, L., Fouchet, E., Cancet, M., Greenberg, D.,
-  Dibarboure, G. and Picot, N.: "FES2022 a step towards a SWOT-compliant tidal
-  correction", in preparation, to be submitted to Ocean Sciences in 2024.
+* Lyard, F., Carrere, L., Fouchet, E., Cancet, M., Greenberg, D.,
+  Dibarboure, G., and Picot, N.: FES2022 a step towards a SWOTcompliant tidal
+  correction, Submitted to J. Geophy. Res., in review, 2025
 
 * Lyard, F. H., Allain, D. J., Cancet, M., Carrère, L., and Picot, N.: FES2014
   global ocean tide atlas: design and performance, Ocean Sci., 17, 615–649,

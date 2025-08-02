@@ -16,7 +16,6 @@ import pathlib
 
 import matplotlib.pyplot
 import netCDF4
-import numpy
 import pyfes
 
 # %%
@@ -47,15 +46,15 @@ print(pyfes.constituents.known())
 # If you want to restrict the analysis to only a few components, you must
 # provide a list to the constructor in order to specify the waves to be
 # analyzed.
-# wt = pyfes.WaveTable([
-#    'Mm', 'Mf', 'Mtm', 'Msqm', '2Q1', 'Sigma1', 'Q1', 'Rho1', 'O1', 'MP1',
-#    'M11', 'M12', 'M13', 'Chi1', 'Pi1', 'P1', 'S1', 'K1', 'Psi1', 'Phi1',
-#    'Theta1', 'J1', 'OO1', 'MNS2', 'Eps2', '2N2', 'Mu2', '2MS2', 'N2', 'Nu2',
-#    'M2', 'MKS2', 'Lambda2', 'L2', '2MN2', 'T2', 'S2', 'R2', 'K2', 'MSN2',
-#    'Eta2', '2SM2', 'MO3', '2MK3', 'M3', 'MK3', 'N4', 'MN4', 'M4', 'SN4',
-#    'MS4', 'MK4', 'S4', 'SK4', 'R4', '2MN6', 'M6', 'MSN6', '2MS6', '2MK6',
-#    '2SM6', 'MSK6', 'S6', 'M8', 'MSf', 'Ssa', 'Sa'
-# ])
+wt = pyfes.WaveTable([
+    'Mm', 'Mf', 'Mtm', 'Msqm', '2Q1', 'Sigma1', 'Q1', 'Rho1', 'O1', 'MP1',
+    'M11', 'M12', 'M13', 'Chi1', 'Pi1', 'P1', 'S1', 'K1', 'Psi1', 'Phi1',
+    'Theta1', 'J1', 'OO1', 'MNS2', 'Eps2', '2N2', 'Mu2', '2MS2', 'N2', 'Nu2',
+    'M2', 'MKS2', 'Lambda2', 'L2', '2MN2', 'T2', 'S2', 'R2', 'K2', 'MSN2',
+    'Eta2', '2SM2', 'MO3', '2MK3', 'M3', 'MK3', 'N4', 'MN4', 'M4', 'SN4',
+    'MS4', 'MK4', 'S4', 'SK4', 'R4', '2MN6', 'M6', 'MSN6', '2MS6', '2MK6',
+    '2SM6', 'MSK6', 'S6', 'M8', 'MSf', 'Ssa', 'Sa'
+])
 
 # %%
 # The :py:meth:`pyfes.WaveTable.keys <pyfes.core.WaveTable.keys>` method
@@ -79,12 +78,11 @@ f, vu = wt.compute_nodal_modulations(time, leap_seconds)
 # <pyfes.wave_table.WaveTable.harmonic_analysis>` to determine the properties
 # of the different tidal waves defined during the construction of the instance.
 w = wt.harmonic_analysis(h, f, vu)
-print(w)
+
 # %%
 # This result can then be used to determine a tidal height for the analyzed time
 # series:
 h_tide = wt.tide_from_tide_series(time, leap_seconds, w)
-print(numpy.max(numpy.abs(h - h_tide)))
 
 # %%
 # Finally, we can visualize the original signal's height adjusted by the tidal
@@ -94,4 +92,3 @@ print(numpy.max(numpy.abs(h - h_tide)))
 matplotlib.pyplot.plot(time, h, label='Original')
 matplotlib.pyplot.plot(time, h - h_tide, label='Corrected height')
 matplotlib.pyplot.legend()
-matplotlib.pyplot.show()
