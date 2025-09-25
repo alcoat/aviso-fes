@@ -15,11 +15,11 @@
 namespace fes {
 namespace geometry {
 
-/// Base class for the Point point.
+/// Box type definition.
 using box_t = boost::geometry::model::box<point_t>;
 
 /// @brief Geographic box.
-class Box : public box_t {
+class Box {
  public:
   /// Default constructor.
   Box() = default;
@@ -28,30 +28,62 @@ class Box : public box_t {
   ///
   /// @param[in] min_corner The minimum corner of the box.
   /// @param[in] max_corner The maximum corner of the box.
-  constexpr Box(const Point& min_corner, const Point& max_corner)
-      : box_t{
-            {detail::math::normalize_angle(min_corner.lon()), min_corner.lat()},
-            {detail::math::normalize_angle(max_corner.lon()),
-             max_corner.lat()}} {}
+  Box(const Point& min_corner, const Point& max_corner) {
+    auto lon1 = detail::math::normalize_angle(min_corner.lon());
+    auto lon2 = detail::math::normalize_angle(max_corner.lon());
+    auto lat1 = min_corner.lat();
+    auto lat2 = max_corner.lat();
+
+    crosses_dateline_ = lon1 > lon2;
+
+    if (crosses_dateline_) {
+      boost::geometry::assign_values(box1_, lon1, lat1, 180.0, lat2);
+      boost::geometry::assign_values(box2_, -180.0, lat1, lon2, lat2);
+    } else {
+      boost::geometry::assign_values(box1_, lon1, lat1, lon2, lat2);
+    }
+    if (!boost::geometry::is_valid(box1_) ||
+        (crosses_dateline_ && !boost::geometry::is_valid(box2_))) {
+      throw std::invalid_argument("Invalid box: check the corner coordinates");
+    }
+  }
 
   /// @brief Get the minimum corner of the box.
   ///
   /// @return The minimum corner of the box.
-  inline auto min_corner() const -> Point {
-    auto* base = reinterpret_cast<const box_t*>(this);
-    return Point{base->min_corner().get<0>(), base->min_corner().get<1>()};
+  constexpr auto min_corner() const -> Point {
+    return Point(boost::geometry::get<boost::geometry::min_corner, 0>(box1_),
+                 boost::geometry::get<boost::geometry::min_corner, 1>(box1_));
   }
 
   /// @brief Get the maximum corner of the box.
   ///
   /// @return The maximum corner of the box.
-  inline auto max_corner() const -> Point {
-    auto* base = reinterpret_cast<const box_t*>(this);
-    return Point{base->max_corner().get<0>(), base->max_corner().get<1>()};
+  constexpr auto max_corner() const -> Point {
+    if (crosses_dateline_) {
+      return Point(boost::geometry::get<boost::geometry::max_corner, 0>(box2_),
+                   boost::geometry::get<boost::geometry::max_corner, 1>(box2_));
+    }
+    return Point(boost::geometry::get<boost::geometry::max_corner, 0>(box1_),
+                 boost::geometry::get<boost::geometry::max_corner, 1>(box1_));
   }
 
   /// Write the geographic box to a stream.
   friend auto operator<<(std::ostream& os, const Box& box) -> std::ostream&;
+
+  /// Get the WKT representation of the box.
+  auto wkt() const -> boost::geometry::wkt_manipulator<box_t> {
+    if (crosses_dateline_) {
+      auto box = box_t{};
+      boost::geometry::assign_values(
+          box, boost::geometry::get<0>(box1_.min_corner()),
+          boost::geometry::get<1>(box1_.min_corner()),
+          boost::geometry::get<0>(box2_.max_corner()),
+          boost::geometry::get<1>(box2_.max_corner()));
+      return boost::geometry::wkt(box);
+    }
+    return boost::geometry::wkt(box1_);
+  }
 
   /// Convert the box to a string representation.
   explicit inline operator std::string() const {
@@ -60,92 +92,28 @@ class Box : public box_t {
     return ss.str();
   }
 
-  /// @brief Check if a triangle intersects the box.
+  /// @brief Check if a geometry intersects the box.
   ///
-  /// @param[in] triangle The triangle.
-  /// @return True if the triangle intersects the box, false otherwise.
-  inline auto intersects(const Triangle& triangle) const -> bool {
-    return boost::geometry::intersects(triangle, *this);
-  }
-};
-
-}  // namespace geometry
-}  // namespace fes
-
-namespace boost {
-namespace geometry {
-namespace traits {
-
-namespace fg = fes::geometry;
-
-/// @brief Tag of the Box box.
-template <>
-struct tag<fg::Box> {
-  /// @brief Box tag.
-  using type = box_tag;
-};
-
-/// @brief Point type of the Box box.
-template <>
-struct point_type<fg::Box> {
-  /// @brief Point type of the Box box.
-  using type = fg::Point;
-};
-
-/// @brief Get the minimum corner of the Box box.
-template <std::size_t Dimension>
-struct indexed_access<fg::Box, min_corner, Dimension> {
-  /// @brief Get the coordinate at the specified index.
-  ///
-  /// @param[in] box The box.
-  /// @return The coordinate at the specified index.
-  static auto get(const fg::Box& box) -> double {
-    return box.min_corner().get<Dimension>();
+  /// @param[in] geometry The geometry to test.
+  /// @return True if the geometry intersects the box, false otherwise.
+  template <typename Geometry>
+  inline auto intersects(const Geometry& geometry) const -> bool {
+    if (crosses_dateline_) {
+      return boost::geometry::intersects(box1_, geometry) ||
+             boost::geometry::intersects(box2_, geometry);
+    } else {
+      return boost::geometry::intersects(box1_, geometry);
+    }
   }
 
-  /// @brief Set the coordinate at the specified index.
-  ///
-  /// @param[in,out] box The box.
-  /// @param[in] value The value.
-  static void set(fg::Box& box, double value) {
-    geometry::set<Dimension>(box.min_corner(), value);
-  }
+ private:
+  box_t box1_{};
+  box_t box2_{};
+  bool crosses_dateline_{false};
 };
 
-/// @brief Index access for the Box box.
-template <std::size_t Dimension>
-struct indexed_access<fg::Box, max_corner, Dimension> {
-  /// @brief Get the coordinate at the specified index.
-  ///
-  /// @param[in] box The box.
-  /// @return The coordinate at the specified index.
-  static auto get(const fg::Box& box) -> double {
-    return box.max_corner().get<Dimension>();
-  }
-
-  /// @brief Set the coordinate at the specified index.
-  ///
-  /// @param[in,out] box The box.
-  /// @param[in] value The value.
-  static void set(fg::Box& box, double value) {
-    geometry::set<Dimension>(box.max_corner(), value);
-  }
-};
-
-}  // namespace traits
-}  // namespace geometry
-}  // namespace boost
-
-namespace fes {
-namespace geometry {
-
-/// @brief Write the geographic box to a stream.
-///
-/// @param[in,out] os The output stream.
-/// @param[in] box The box.
-/// @return The output stream.
 inline auto operator<<(std::ostream& os, const Box& box) -> std::ostream& {
-  os << boost::geometry::wkt(box);
+  os << box.wkt();
   return os;
 }
 

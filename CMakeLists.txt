@@ -304,7 +304,9 @@ if(FES_ENABLE_COVERAGE)
 endif()
 
 message(STATUS "")
-message(STATUS "========== FES Configuration Summary ==========")
+message(
+  STATUS
+    "====================[ FES Configuration Summary ]=====================")
 message(STATUS "Version                : ${FES_VERSION}.${FES_VERSION_TYPE}")
 if(FES_VERSION_TYPE MATCHES "dev")
   message(STATUS "Release Type           : Development")
@@ -332,5 +334,7 @@ message(STATUS "C++ Extensions         : ${CMAKE_CXX_EXTENSIONS}")
 message(STATUS "Position Independent   : ${CMAKE_POSITION_INDEPENDENT_CODE}")
 message(STATUS "CXX Flags              : ${CMAKE_CXX_FLAGS}")
 message(STATUS "Install RPATH          : ${CMAKE_INSTALL_RPATH}")
-message(STATUS "===============================================")
+message(
+  STATUS
+    "=======================================================================")
 message(STATUS "")
