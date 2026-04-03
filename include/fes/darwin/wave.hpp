@@ -621,9 +621,7 @@ class Nu2 : public Wave {
 /// @note Schureman: %Table 2, Page 165, Ref. A39
 class MA2 : public Wave {
  public:
-  constexpr MA2()
-      : Wave(kMA2, kShortPeriod, false, 2, -2, 1, 0, 0, 0, 0, 2, -2, 0, 0,
-             &angle::Astronomic::f_m2) {}
+  MA2();
 };
 
 /// @brief @f$M_2@f$
@@ -651,9 +649,7 @@ class M2 : public Wave {
 /// @note Schureman: %Table 2, Page 165, Ref. A39
 class MB2 : public Wave {
  public:
-  constexpr MB2()
-      : Wave(kMB2, kShortPeriod, false, 2, -2, 3, 0, 0, 0, 0, 2, -2, 0, 0,
-             &angle::Astronomic::f_m2) {}
+  MB2();
 };
 
 /// @brief @f$MKS_2 = M_2 + K_2 - S_2@f$
@@ -871,15 +867,13 @@ class MK3 : public Wave {
 ///
 /// <table>
 /// <tr><th>V</th><th>u</th><th>Factor-f</th></tr>
-/// <tr><td>@f$2T@f$</td>
+/// <tr><td>@f$3T@f$</td>
 /// <td>@f$0@f$</td>
 /// <td>@f$1@f$</td></tr>
 /// </table>
 class S3 : public Wave {
  public:
-  constexpr S3()
-      : Wave(kS3, kShortPeriod, false, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-             &angle::Astronomic::f_m22) {}
+  S3();
 };
 
 /// @brief @f$N_4 = N_2 + N_2@f$
