@@ -1,5 +1,4 @@
-"""
-***************************************************
+"""***************************************************
 Tidal Elevation Prediction using LPG Discretization
 ***************************************************
 
@@ -15,6 +14,7 @@ predict tidal elevation in a specified area of interest.
 
 First, we import the required modules.
 """
+
 # %%
 from __future__ import annotations
 
@@ -24,7 +24,9 @@ import pathlib
 import cartopy.crs
 import matplotlib.pyplot
 import numpy
+
 import pyfes
+
 
 # %%
 # First we create an environment variable to store the path to the model file.
@@ -37,21 +39,25 @@ import pyfes
 #     `GitHub repository
 #     <https://github.com/CNES/aviso-fes/blob/main/examples/fes_lpg.yml>`_.
 #
-os.environ['DATASET_DIR'] = str(pathlib.Path().absolute().parent / 'tests' /
-                                'python' / 'dataset')
+os.environ['DATASET_DIR'] = str(
+    pathlib.Path().absolute().parent / 'tests' / 'python' / 'dataset'
+)
 
-handlers: dict[str, pyfes.core.AbstractTidalModelComplex128
-               | pyfes.core.AbstractTidalModelComplex64]
-handlers = pyfes.load_config(pathlib.Path().absolute() / 'fes_lpg.yml')
+config = pyfes.config.load(pathlib.Path().absolute() / 'fes_lpg.yml')
 
 # %%
-# ``handlers`` is a dictionary that contains the handlers to the ocean and
-# radial tide models.
-print(handlers)
+# Please note that loading a global model can take up a lot of memory.
+print(f'Model memory usage: {config.memory_usage() / 1e6:.2f} MB')
+
+# %%
+# ``config`` is a :py:class:`~pyfes.config.Configuration` namedtuple that
+# contains the tidal models and the runtime settings loaded from the
+# configuration file.
+print(config)
 
 # %%
 # Define the area of interest.
-# Here we are interested in the area around the french coast.
+# Here we are interested in the area around the French coast.
 LON_MIN = -5.0
 LON_MAX = 10.0
 LAT_MIN = 40.0
@@ -70,7 +76,7 @@ EXTRAPOLATED = 2
 
 # %%
 # We can now create a grid to calculate the geocentric ocean tide around the
-# french coast.
+# French coast.
 lons = numpy.arange(LON_MIN, LON_MAX + LON_STEP, LON_STEP)
 lats = numpy.arange(LAT_MIN, LAT_MAX + LAT_STEP, LAT_STEP)
 lons, lats = numpy.meshgrid(lons, lats)
@@ -80,18 +86,18 @@ dates = numpy.full(shape, 'now', dtype='datetime64[us]')
 # %%
 # We can now calculate the ocean tide and the radial tide.
 tide, lp, lgp_flag = pyfes.evaluate_tide(
-    handlers['tide'],
+    config.models['tide'],
     dates.ravel(),
     lons.ravel(),
     lats.ravel(),
-    num_threads=0,
+    settings=config.settings,
 )
 load, load_lp, _ = pyfes.evaluate_tide(
-    handlers['radial'],
+    config.models['radial'],
     dates.ravel(),
     lons.ravel(),
     lats.ravel(),
-    num_threads=0,
+    settings=config.settings,
 )
 
 # %%
@@ -113,29 +119,30 @@ flags[lgp_flag < 0] = EXTRAPOLATED
 # %%
 # We can now plot the result.
 fig = matplotlib.pyplot.figure(figsize=(15, 10))
-fig.suptitle(f'Tide and Interpolation Quality Flag on {dates[0, 0]}',
-             fontsize=16)
+fig.suptitle(
+    f'Tide and Interpolation Quality Flag on {dates[0, 0]}', fontsize=16
+)
 
 # Plot the geocentric ocean tide
 ax1 = fig.add_subplot(1, 2, 1, projection=cartopy.crs.PlateCarree())
-ax1.set_extent([LON_MIN, LON_MAX, LAT_MIN, LAT_MAX],
-               crs=cartopy.crs.PlateCarree())
+ax1.set_extent(
+    [LON_MIN, LON_MAX, LAT_MIN, LAT_MAX], crs=cartopy.crs.PlateCarree()
+)
 ax1.coastlines()
 ax1.set_title('Geocentric Ocean Tide')
 ax1.set_xlabel('Longitude')
 ax1.set_ylabel('Latitude')
-mesh1 = ax1.pcolormesh(lons,
-                       lats,
-                       geo_tide,
-                       shading='auto',
-                       transform=cartopy.crs.PlateCarree())
+mesh1 = ax1.pcolormesh(
+    lons, lats, geo_tide, shading='auto', transform=cartopy.crs.PlateCarree()
+)
 colorbar1 = fig.colorbar(mesh1, ax=ax1, orientation='horizontal', pad=0.05)
 colorbar1.set_label('Geocentric ocean tide (cm)')
 
 # Plot the interpolation quality flag
 ax2 = fig.add_subplot(1, 2, 2, projection=cartopy.crs.PlateCarree())
-ax2.set_extent([LON_MIN, LON_MAX, LAT_MIN, LAT_MAX],
-               crs=cartopy.crs.PlateCarree())
+ax2.set_extent(
+    [LON_MIN, LON_MAX, LAT_MIN, LAT_MAX], crs=cartopy.crs.PlateCarree()
+)
 ax2.coastlines()
 ax2.set_title('Interpolation Quality Flag')
 ax2.set_xlabel('Longitude')
@@ -159,11 +166,13 @@ colorbar2 = fig.colorbar(
         EXTRAPOLATED,
     ],
 )
-colorbar2.set_ticklabels([
-    'Undefined',
-    'Interpolated',
-    'Extrapolated',
-])
+colorbar2.set_ticklabels(
+    [
+        'Undefined',
+        'Interpolated',
+        'Extrapolated',
+    ]
+)
 colorbar2.set_label('Interpolation Quality Flag')
 fig.tight_layout()
 matplotlib.pyplot.show()

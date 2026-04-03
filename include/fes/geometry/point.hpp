@@ -1,4 +1,4 @@
-// Copyright (c) 2025 CNES
+// Copyright (c) 2026 CNES
 //
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
@@ -8,7 +8,6 @@
 
 #include <boost/geometry.hpp>
 #include <ostream>
-#include <set>
 #include <sstream>
 #include <string>
 
@@ -19,28 +18,27 @@ namespace fes {
 namespace geometry {
 
 /// Base class for the Point point.
-using point_t = boost::geometry::model::point<
+using GeographicPoint2D = boost::geometry::model::point<
     double, 2, boost::geometry::cs::geographic<boost::geometry::degree>>;
 
 /// @brief Geographic point.
-class Point : public point_t {
+class Point : public GeographicPoint2D {
  public:
   /// Default constructor.
   Point() = default;
 
   /// Build a Point point from a latitude and longitude expressed in
   /// degrees.
-  constexpr Point(double lon, double lat) : point_t(lon, lat) {}
+  constexpr Point(double lon, double lat) : GeographicPoint2D(lon, lat) {}
 
   /// Convert the point to an ECEF point.
-  FES_MATH_CONSTEXPR explicit operator geometry::EarthCenteredEarthFixed()
-      const;
+  FES_MATH_CONSTEXPR explicit operator EarthCenteredEarthFixed() const;
 
   /// Write the geographic point to a stream.
   friend auto operator<<(std::ostream& os, const Point& point) -> std::ostream&;
 
   /// Convert the point to a string representation.
-  explicit inline operator std::string() const {
+  explicit operator std::string() const {
     auto ss = std::stringstream{};
     ss << *this;
     return ss.str();
@@ -55,12 +53,12 @@ class Point : public point_t {
   /// Set the longitude in degrees.
   ///
   /// @param[in] lon The longitude in degrees.
-  inline auto lon(const double lon) { set<0>(lon); }
+  auto lon(const double lon) { set<0>(lon); }
 
   /// Set the latitude in degrees.
   ///
   /// @param[in] lat The latitude in degrees.
-  inline auto lat(const double lat) { set<1>(lat); }
+  auto lat(const double lat) { set<1>(lat); }
 
   /// Return true if this instance is valid.
   FES_MATH_CONSTEXPR auto is_valid() const -> bool {
@@ -71,7 +69,7 @@ class Point : public point_t {
   ///
   /// @param[in] other The other point.
   /// @return True if the point is equal to the other point.
-  inline auto operator==(const Point& other) const -> bool {
+  auto operator==(const Point& other) const -> bool {
     return boost::geometry::equals(*this, other);
   }
 };
@@ -142,7 +140,7 @@ inline auto operator<<(std::ostream& os, const Point& point) -> std::ostream& {
   return os;
 }
 
-FES_MATH_CONSTEXPR Point::operator geometry::EarthCenteredEarthFixed() const {
+FES_MATH_CONSTEXPR Point::operator EarthCenteredEarthFixed() const {
   // Global variables of Earth's geometric constants (WGS84)
   // Equatorial Radius [m]
   constexpr const double A = 6378137.0;
@@ -156,8 +154,8 @@ FES_MATH_CONSTEXPR Point::operator geometry::EarthCenteredEarthFixed() const {
   auto sincos_x = detail::math::sincosd(lon());
   auto sincos_y = detail::math::sincosd(lat());
   const auto chi =
-      std::sqrt(1.0 - detail::math::pow<2>(E) *
-                          detail::math::pow<2>(std::get<0>(sincos_y)));
+      std::sqrt(1.0 - (detail::math::pow<2>(E) *
+                       detail::math::pow<2>(std::get<0>(sincos_y))));
   const auto a_chi = A / chi;
 
   return {a_chi * std::get<1>(sincos_y) * std::get<1>(sincos_x),

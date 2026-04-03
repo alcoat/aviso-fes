@@ -1,14 +1,12 @@
-// Copyright (c) 2025 CNES
+// Copyright (c) 2026 CNES
 //
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 /// @file include/fes/detail/math.hpp
 /// @brief Mathematical functions
 #pragma once
-#include <array>
 #include <cmath>
 #include <complex>
-#include <iostream>
 #include <limits>
 #include <tuple>
 #include <type_traits>
@@ -157,11 +155,11 @@ constexpr auto pow(const T& x) noexcept -> T {
   return Power<T, N>::eval(x);
 }
 
-/// Convert angle x from radians to degrees.
+/// Convert angle x from degrees to radians.
 ///
 /// @tparam T The type of the result.
-/// @param[in] x Angle in radians.
-/// @return Angle in degrees.
+/// @param[in] x Angle in degrees.
+/// @return Angle in radians.
 template <typename T>
 constexpr auto radians(const T& x) noexcept -> T {
   return x * pi<T>() / T(180);
@@ -173,18 +171,18 @@ constexpr auto radians(const T& x) noexcept -> T {
 /// @param[in] x Angle in arcseconds.
 /// @return Angle in radians.
 template <typename T>
-constexpr auto arcseconds(const T& x) noexcept -> T {
+constexpr auto arcseconds2radians(const T& x) noexcept -> T {
   // 1 arcsecond = 1/3600 degrees
   // 1 degree = π/180 radians
   // => 1 arcsecond = π/(180 * 3600) radians
   return x * pi<T>() / (T(180) * T(3600));
 }
 
-/// Convert angle x from degrees to radians.
+/// Convert angle x from radians to degrees.
 ///
 /// @tparam T The type of the result.
-/// @param[in] x Angle in degrees.
-/// @return Angle in radians.
+/// @param[in] x Angle in radians.
+/// @return Angle in degrees.
 template <typename T>
 constexpr auto degrees(const T& x) noexcept -> T {
   return x * T(180) / pi<T>();
@@ -296,7 +294,7 @@ constexpr auto remainder(const T& x, const T& y) noexcept -> T {
 /// @param[in] circle Circle value
 /// @return the angle reduced to the range [min, circle + min[
 template <typename T>
-constexpr auto normalize_angle(const T& x, const T& min = T(-180),
+constexpr auto normalize_angle(const T& x, const T& min = T(0),
                                const T& circle = T(360)) noexcept -> T {
   return remainder(x - min, circle) + min;
 }
@@ -400,7 +398,7 @@ constexpr auto horner(const T x, Args... args) -> T {
   auto result = coefficients[ix];
   while (ix > 0) {
     ix--;
-    result = result * x + coefficients[ix];
+    result = (result * x) + coefficients[ix];
   }
   return result;
 }
@@ -416,7 +414,7 @@ constexpr auto horner(const T x, Args... args) -> T {
 template <typename T>
 constexpr auto dms_to_degrees(const T degrees, const T minutes,
                               const T seconds) noexcept -> T {
-  return degrees + (minutes + seconds / T(60)) / T(60);
+  return degrees + ((minutes + seconds / T(60)) / T(60));
 }
 
 }  // namespace math

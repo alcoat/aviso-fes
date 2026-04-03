@@ -1,21 +1,17 @@
-// Copyright (c) 2025 CNES
+// Copyright (c) 2026 CNES
 //
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 #include "fes/mesh/index.hpp"
 
 #include <algorithm>
-#include <exception>
 #include <limits>
 #include <set>
-#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "fes/detail/isviewstream.hpp"
 #include "fes/detail/math.hpp"
-#include "fes/detail/serialize.hpp"
 
 namespace fes {
 namespace mesh {
@@ -62,7 +58,7 @@ Index::Index(Eigen::VectorXd lon, Eigen::VectorXd lat,
                 [](double& lon) { lon = detail::math::normalize_angle(lon); });
 
   // Allocate the values used to build the index.
-  auto values = std::vector<value_t>{};
+  auto values = std::vector<ValueType>{};
   values.reserve(triangles_.rows() * 3);
 
   for (auto ix = 0; ix < triangles_.rows(); ++ix) {
@@ -78,7 +74,7 @@ Index::Index(Eigen::VectorXd lon, Eigen::VectorXd lat,
                           std::make_pair(jx, ix));
     }
   }
-  rtree_ = rtree_t{values.begin(), values.end()};
+  rtree_ = RTreeType{values.begin(), values.end()};
 }
 
 auto Index::search(const geometry::Point& point,
@@ -153,29 +149,6 @@ auto Index::selected_triangles(const geometry::Box& bbox) const
   }
 
   return result;
-}
-
-auto Index::getstate() const -> std::string {
-  auto ss = std::stringstream();
-  ss.exceptions(std::stringstream::failbit);
-  detail::serialize::write_matrix(ss, lon_);
-  detail::serialize::write_matrix(ss, lat_);
-  detail::serialize::write_matrix(ss, triangles_);
-  return ss.str();
-}
-
-auto Index::setstate(const string_view& data) -> Index {
-  detail::isviewstream ss(data);
-  ss.exceptions(std::stringstream::failbit);
-  try {
-    auto lon = detail::serialize::read_matrix<double, Eigen::Dynamic, 1>(ss);
-    auto lat = detail::serialize::read_matrix<double, Eigen::Dynamic, 1>(ss);
-    auto triangles =
-        detail::serialize::read_matrix<int32_t, Eigen::Dynamic, 3>(ss);
-    return Index(std::move(lon), std::move(lat), std::move(triangles));
-  } catch (const std::exception&) {
-    throw std::invalid_argument("invalid index state");
-  }
 }
 
 }  // namespace mesh

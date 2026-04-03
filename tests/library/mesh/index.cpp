@@ -1,4 +1,4 @@
-// Copyright (c) 2025 CNES
+// Copyright (c) 2026 CNES
 //
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
@@ -6,7 +6,8 @@
 
 #include <gtest/gtest.h>
 
-namespace mesh = fes::mesh;
+namespace fes {
+namespace mesh {
 
 static auto make_data()
     -> std::tuple<Eigen::VectorXd, Eigen::VectorXd, Eigen::Matrix<int, -1, 3>> {
@@ -48,55 +49,13 @@ static auto make_data()
   return std::make_tuple(lon, lat, triangles);
 }
 
-// TEST(Index, Search) {
-//   auto lon = Eigen::VectorXd();
-//   auto lat = Eigen::VectorXd();
-//   auto triangles = Eigen::Matrix<int, -1, 3>();
-//   std::tie(lon, lat, triangles) = make_data();
-
-//   auto index = mesh::Index(lon, lat, triangles);
-
-//   auto query =
-//       index.search({-0.16067459068705148, 0.09857747238454806}, 50'000);
-//   EXPECT_TRUE(query.inside);
-//   EXPECT_EQ(query.index, 5);
-
-//   query = index.search({-0.4057, 0.0717}, 50'000);
-//   EXPECT_TRUE(query.inside);
-//   EXPECT_EQ(query.index, 10);
-
-//   query = index.search({0.2562, 0.0101}, 50'000);
-//   EXPECT_TRUE(query.inside);
-//   EXPECT_EQ(query.index, 18);
-
-//   // This point is outside the convex hull of the mesh, but near enough to
-//   the
-//   // mesh that it should be found.
-//   query = index.search({0.5741, -0.1029}, 50'000);
-//   EXPECT_FALSE(query.inside);
-//   EXPECT_EQ(query.index, 19);
-
-//   // This point is outside the convex hull of the mesh, and too far away to
-//   be
-//   // found.
-//   query = index.search({1, 1}, 50'000);
-//   EXPECT_FALSE(query.inside);
-//   EXPECT_EQ(query.index, -1);
-// }
-
-TEST(Index, Serialize) {
+TEST(Index, Search) {
   auto lon = Eigen::VectorXd();
   auto lat = Eigen::VectorXd();
   auto triangles = Eigen::Matrix<int, -1, 3>();
   std::tie(lon, lat, triangles) = make_data();
 
-  auto index = mesh::Index(lon, lat, triangles);
-
-  auto state = index.getstate();
-  auto other =
-      mesh::Index::setstate(fes::string_view(state.data(), state.size()));
-
-  EXPECT_THROW(mesh::Index::setstate("invalid"), std::invalid_argument);
+  auto index = Index(lon, lat, triangles);
 
   auto query =
       index.search({-0.16067459068705148, 0.09857747238454806}, 50'000);
@@ -106,4 +65,22 @@ TEST(Index, Serialize) {
   query = index.search({-0.4057, 0.0717}, 50'000);
   EXPECT_TRUE(query.is_inside());
   EXPECT_EQ(query.index, 10);
+
+  query = index.search({0.2562, 0.0101}, 50'000);
+  EXPECT_TRUE(query.is_inside());
+  EXPECT_EQ(query.index, 18);
+
+  // This point is outside the convex hull of the mesh
+  query = index.search({0.5741, -0.1029}, 50'000);
+  EXPECT_FALSE(query.is_inside());
+  EXPECT_EQ(query.index, -1);
+
+  // This point is outside the convex hull of the mesh, and too far away to be
+  // found.
+  query = index.search({1, 1}, 50'000);
+  EXPECT_FALSE(query.is_inside());
+  EXPECT_EQ(query.index, -1);
 }
+
+}  // namespace mesh
+}  // namespace fes

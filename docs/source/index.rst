@@ -7,8 +7,8 @@ description of the FES2022 tidal solution is given in the `handbook
 and in the paper (Lyard et al. 2024).
 
 The library uses a set of tidal components to predict the ocean tide at any
-location on the Earth. The source code provides an older version of the FES
-model (99), because it is significantly smaller than newer versions. **Do not
+location on the Earth. The source code provides an older version of the FES99
+model, because it is significantly smaller than newer versions. **Do not
 use it for scientific purposes**. You can download the model from the `AVISO
 <https://www.aviso.altimetry.fr/en/data/products/auxiliary-products/global-tide-fes.html>`_
 website.
@@ -25,46 +25,91 @@ corresponds to a distinct astronomical forcing, such as the gravitational pull
 of the Moon or Sun, or orbital variations like the evection and variation of the
 moon.
 
-As detailed in Schureman's manual [Schureman1940]_, the height of the tide, *h*,
-at any time, *t*, can be expressed by the fundamental equation of harmonic
-prediction:
+As detailed in Schureman's manual [Schureman1940]_ and the SHOM reference
+[Simon2013]_, the height of the tide, :math:`h`, at any time :math:`t`, can be
+expressed by the fundamental harmonic prediction equation:
 
 .. math::
 
-    h(t) = H_0 + A \cos(at + \alpha) + B \cos(bt + \beta) + C \cos(ct + \gamma) + \dots
+    h(t) = H_0 + \sum_{k=1}^{N} f_k \, H_k \,
+    \cos\!\left(\omega_k t + V_k(t) + u_k(t) - G_k\right)
 
 Where:
     * :math:`H_0` is the mean height of the water level above the chart datum.
-    * Each cosine term represents a single **tidal constituent** (e.g., the
+    * Each term in the sum represents a single **tidal constituent** (e.g., the
       principal lunar semidiurnal tide, :math:`M_2`; the principal solar
       semidiurnal tide, :math:`S_2`; etc.).
-    * Amplitude (:math:`A`, :math:`B`, :math:`C`...): This is the strength, or
-      half the range, of each constituent. It is a location-specific value
-      determined from the analysis of tidal observations.
-    * Speed (:math:`a`, :math:`b`, :math:`c`...): This is the angular speed of
-      the constituent, representing how quickly its phase changes. Speeds are
-      constant for each constituent and are derived from universal astronomical
-      data, such as the rotation of the Earth and the orbital periods of the
-      Moon and Sun.
-    * Phase Lag (:math:`\alpha`, :math:`\beta`, :math:`\gamma`...): Also known
-      as the **epoch** (:math:`\kappa`), this value represents the timing of
-      a constituent's high water relative to its theoretical astronomical
-      forcing. Like the amplitude, it is a location-specific constant found
-      through observation.
+    * Amplitude (:math:`H_k`): This is the strength, or half the range, of
+      each constituent. It is a location-specific value determined from the
+      analysis of tidal observations or a tidal atlas.
+    * Speed (:math:`\omega_k`): This is the angular speed of the constituent,
+      representing how quickly its phase changes. Speeds are constant for each
+      constituent and are derived from the six fundamental astronomical
+      variables (see :doc:`theory/harmonic_development`).
+    * Astronomical argument (:math:`V_k`): The equilibrium phase of
+      constituent :math:`k` at the Greenwich meridian, determined by the
+      positions of the Moon and Sun.
+    * Phase Lag (:math:`G_k`): Also known as the **epoch** (:math:`\kappa`),
+      this value represents the timing of a constituent's high water relative
+      to its theoretical astronomical forcing. Like the amplitude, it is a
+      location-specific constant found through observation.
+    * Nodal corrections (:math:`f_k`, :math:`u_k`): Time-dependent factors
+      that account for the 18.61-year lunar nodal cycle. :math:`f_k` modulates
+      the amplitude and :math:`u_k` adjusts the phase
+      (see :doc:`theory/nodal_corrections`).
+
+For a comprehensive treatment of the mathematical foundations underlying this
+equation, see the :doc:`theory/index` section.
 
 The :term:`FES` models, such as FES2022, are sophisticated global atlases that provide
 the location-specific amplitudes (:math:`H`) and phase lags (:math:`\kappa`)
 for a large number of tidal constituents. The **PyFES** library acts as the
-harmonic prediction engine. When a user requests a tide prediction for a
-specific location and time, the library:
+harmonic prediction engine.
 
-1.  Retrieves the amplitude and phase for each constituent from the FES model
+PyFES Dual-Engine Architecture
+-------------------------------
+
+PyFES implements **two distinct prediction engines** that differ in their
+mathematical formulation and constituent notation:
+
+* **FES/Darwin Engine** (``engine: darwin``): Uses :term:`Darwin notation` with
+  Schureman's nodal corrections. This is the classical approach developed for
+  FES tidal atlases (FES2014, FES2022). It supports 99 tidal constituents and
+  follows traditional oceanographic conventions.
+
+* **PERTH/Doodson Engine** (``engine: perth``): Uses :term:`Doodson number`
+  classification with group modulations. Developed by Dr. Richard Ray at NASA
+  Goddard Space Flight Center, this engine is designed for GOT (Goddard Ocean
+  Tide) models. It supports 80 tidal constituents.
+
+Both engines support configurable inference modes (``ZERO``, ``LINEAR``,
+``SPLINE``, ``FOURIER``) for handling minor constituents.
+
+Both engines implement the same fundamental harmonic method but differ in their
+constituent representation and approach to nodal corrections. The choice of
+engine depends on your tidal atlas format. For a detailed comparison, see
+:doc:`engines`.
+
+Prediction Workflow
+-------------------
+
+When a user requests a tide prediction for a specific location and time, PyFES:
+
+1.  Retrieves the amplitude and phase for each constituent from the tidal model
     maps at the desired location.
 2.  Calculates the astronomical argument (the angle inside the cosine function)
     for the specified time using the known astronomical speeds of each constituent.
-3.  Applies the fundamental prediction equation shown above, summing the
+3.  Applies nodal corrections appropriate to the selected engine:
+
+    * **Darwin engine**: Individual Schureman nodal factors (*f*) and phase
+      corrections (*u*)
+    * **PERTH engine**: Group modulation corrections or individual corrections
+      based on configuration
+
+4.  Applies the fundamental prediction equation shown above, summing the
     contributions of all constituents.
-4.  Adds the local mean sea level (:math:`H_0`) to produce the final predicted
+5.  Infers minor constituents not in the atlas using admittance relationships.
+6.  Adds the local mean sea level (:math:`H_0`) to produce the final predicted
     tide height relative to the datum.
 
 References
@@ -72,7 +117,12 @@ References
 
 .. [Schureman1940] Schureman, P. (1940). *Manual of Harmonic Analysis and
     Prediction of Tides*. U.S. Coast and Geodetic Survey, Special
-    Publication No. 98.
+    Publication No. 98. Revised (1940) edition, reprinted 1958 with
+    corrections.
+
+.. [Simon2013] Simon, B. (2013). *Marées Océaniques et Côtières* (Coll.
+    Synthèses, 943-MOC). Institut Océanographique / Service Hydrographique
+    et Océanographique de la Marine (SHOM), Paris.
 
 Bibliography
 ------------
@@ -105,12 +155,12 @@ Contact
    :maxdepth: 1
    :caption: Contents:
 
-   changelog
-   setup
-   conda
+   getting_started
+   user_guide
+   engines
+   constituents/index
    auto_examples/index.rst
-   pyfes
-   api
-   core
-   cxx
+   theory/index
+   api/index
    glossary
+   changelog

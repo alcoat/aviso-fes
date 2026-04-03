@@ -1,0 +1,26 @@
+// Copyright (c) 2026 CNES
+//
+// All rights reserved. Use of this source code is governed by a
+// BSD-style license that can be found in the LICENSE file.
+/// @file include/fes/detail/string.hpp
+/// @brief String utility functions.
+#pragma once
+
+#include <boost/range/algorithm/equal.hpp>
+#include <cctype>
+#include <string>
+
+namespace fes {
+namespace detail {
+
+/// @brief Case-insensitive string comparison.
+/// @param[in] a First string to compare.
+/// @param[in] b Second string to compare.
+/// @return True if the strings are equal ignoring case, false otherwise.
+inline auto iequals(const std::string &a, const std::string &b) -> bool {
+  return boost::range::equal(
+      a, b, [](char a, char b) { return tolower(a) == tolower(b); });
+}
+
+}  // namespace detail
+}  // namespace fes

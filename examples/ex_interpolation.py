@@ -1,13 +1,20 @@
-"""
-******************
+"""******************
 Mesh Interpolation
 ******************
 
 This example demonstrates how to interpolate a tidal model stored in a mesh
 using LGP2 discretization.
 
+.. note::
+
+   This is a low-level example that demonstrates direct interaction with the
+   C++ core classes for model interpolation. For standard use cases, it is
+   recommended to use the high-level :func:`pyfes.evaluate_tide` function
+   with a configuration file, as shown in :doc:`ex_prediction`.
+
 First, we import the required modules.
 """
+
 # %%
 from __future__ import annotations
 
@@ -17,11 +24,18 @@ import cartopy.crs
 import matplotlib.pyplot
 import netCDF4
 import numpy
+
 import pyfes
 
+
 # %%
-MODEL = str(pathlib.Path().absolute().parent / 'tests' / 'python' / 'dataset' /
-            'fes_2014.nc')
+MODEL = str(
+    pathlib.Path().absolute().parent
+    / 'tests'
+    / 'python'
+    / 'dataset'
+    / 'fes_2014.nc'
+)
 
 
 # %%
@@ -31,7 +45,7 @@ def load_model(
     wave: str,
     max_distance: float = 0.0,
 ) -> pyfes.core.tidal_model.LGP2Complex64:
-    """"Load a tidal wave model from a netCDF file.
+    """Load a tidal wave model from a netCDF file.
 
     Args:
         model: Path to the netCDF file.
@@ -41,8 +55,9 @@ def load_model(
 
     Returns:
         The tidal wave model.
+
     """
-    with netCDF4.Dataset(model, 'r') as ds:  # type: ignore
+    with netCDF4.Dataset(model, 'r') as ds:
         lon = ds.variables['lon'][:]
         lat = ds.variables['lat'][:]
         triangle = ds.variables['triangle'][:]
@@ -51,12 +66,12 @@ def load_model(
         amp = numpy.ma.filled(ds.variables[f'{wave}_amp'][:], numpy.nan)
         pha = numpy.ma.filled(ds.variables[f'{wave}_phase'][:], numpy.nan)
         pha = numpy.radians(pha)
-        values = amp * numpy.cos(pha) + 1j * amp * numpy.sin(pha)
+        values = amp * numpy.exp(1j * pha)
 
         result = pyfes.core.tidal_model.LGP2Complex64(
             pyfes.core.mesh.Index(lon, lat, triangle),
             codes=code,
-            tide_type=pyfes.core.kTide,
+            tide_type=pyfes.TIDE,
             max_distance=max_distance,
         )
         result.add_constituent(wave, values)
@@ -79,7 +94,7 @@ lon, lat = numpy.meshgrid(
 # Interpolate the waves loaded from the model.
 values, quality = model.interpolate(lon.ravel(), lat.ravel(), num_threads=1)
 # %%
-# Values is dictionary of numpy arrays. Each key is the name of a wave and the
+# Values is a dictionary of numpy arrays. Each key is the name of a wave and the
 # value is the interpolated values. Quality is a numpy array of integers. The
 # value is positive if the point is interpolated, negative if the point is
 # extrapolated with the nearest vertices and zero if the point is outside the
@@ -88,7 +103,7 @@ print(values)
 
 # %%
 # Calculate the amplitude of the M2 wave interpolated on the grid.
-grid = values[pyfes.core.kM2]
+grid = values['M2']
 grid = numpy.ma.masked_invalid(grid)
 grid = grid.reshape(lon.shape)
 grid = numpy.absolute(grid)
@@ -99,13 +114,15 @@ fig = matplotlib.pyplot.figure(figsize=(10, 10))
 ax = fig.add_subplot(1, 1, 1, projection=cartopy.crs.PlateCarree())
 ax.set_extent([-5.0, 10.0, 40.0, 55.0], crs=cartopy.crs.PlateCarree())
 ax.coastlines()
-contour = ax.pcolormesh(lon,
-                        lat,
-                        grid,
-                        transform=cartopy.crs.PlateCarree(),
-                        cmap='terrain',
-                        vmin=0.0,
-                        vmax=400.0)
+contour = ax.pcolormesh(
+    lon,
+    lat,
+    grid,
+    transform=cartopy.crs.PlateCarree(),
+    cmap='terrain',
+    vmin=0.0,
+    vmax=400.0,
+)
 cbar = matplotlib.pyplot.colorbar(contour, ax=ax, orientation='vertical')
 cbar.set_label('Amplitude (cm)')
 matplotlib.pyplot.show()
@@ -123,7 +140,7 @@ matplotlib.pyplot.show()
 #   calculated on the sphere. The expected unit is meters.
 model = load_model(MODEL, 'M2', max_distance=20_000.0)
 values, quality = model.interpolate(lon.ravel(), lat.ravel(), num_threads=1)
-grid = values[pyfes.core.kM2]
+grid = values['M2']
 grid = numpy.ma.masked_invalid(grid)
 grid = grid.reshape(lon.shape)
 grid = numpy.absolute(grid)
@@ -134,13 +151,15 @@ fig = matplotlib.pyplot.figure(figsize=(10, 10))
 ax = fig.add_subplot(1, 1, 1, projection=cartopy.crs.PlateCarree())
 ax.set_extent([-5.0, 10.0, 40.0, 55.0], crs=cartopy.crs.PlateCarree())
 ax.coastlines()
-contour = ax.pcolormesh(lon,
-                        lat,
-                        grid,
-                        transform=cartopy.crs.PlateCarree(),
-                        cmap='terrain',
-                        vmin=0.0,
-                        vmax=400.0)
+contour = ax.pcolormesh(
+    lon,
+    lat,
+    grid,
+    transform=cartopy.crs.PlateCarree(),
+    cmap='terrain',
+    vmin=0.0,
+    vmax=400.0,
+)
 cbar = matplotlib.pyplot.colorbar(contour, ax=ax, orientation='vertical')
 cbar.set_label('Amplitude (cm)')
 matplotlib.pyplot.show()

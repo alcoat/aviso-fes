@@ -1,10 +1,13 @@
-// Copyright (c) 2025 CNES
+// Copyright (c) 2026 CNES
 //
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 #include <gtest/gtest.h>
 
+#include "fes/darwin/constituent.hpp"
 #include "fes/tidal_model/lgp.hpp"
+
+namespace fes {
 
 TEST(InterpolatorLGP1, Constructor) {
   auto lon = Eigen::VectorXd(19);
@@ -71,19 +74,15 @@ TEST(InterpolatorLGP1, Constructor) {
 
   values.setOnes();
 
-  auto index = std::make_shared<fes::mesh::Index>(lon, lat, triangles);
+  auto index = std::make_shared<mesh::Index>(lon, lat, triangles);
 
-  fes::tidal_model::LGP1<double> lgp1(std::move(index), std::move(codes),
-                                      fes::kTide);
-  lgp1.add_constituent(fes::kS2, values);
-  auto acc = std::unique_ptr<fes::Accelerator>(
-      lgp1.accelerator(fes::angle::Formulae::kMeeus, 0.0));
-  fes::Quality quality;
-  auto x = lgp1.interpolate({0.0, 0.0}, quality, acc.get());
-
-  auto state = lgp1.getstate();
-  auto other = fes::tidal_model::LGP1<double>::setstate(
-      fes::string_view(state.data(), state.size()));
-  auto y = other.interpolate({0.0, 0.0}, quality, acc.get());
-  EXPECT_EQ(x, y);
+  tidal_model::LGP1<double> lgp1(std::move(index), std::move(codes), kTide);
+  lgp1.add_constituent(kS2, values);
+  auto acc = std::unique_ptr<Accelerator>(
+      lgp1.accelerator(angle::Formulae::kMeeus, 0.0));
+  Quality quality = 0;
+  auto x = lgp1.interpolate({0.0, 0.0}, quality, *acc);
+  EXPECT_EQ(x.size(), 1);
 }
+
+}  // namespace fes

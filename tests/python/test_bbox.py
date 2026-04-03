@@ -1,20 +1,21 @@
-# Copyright (c) 2025 CNES
+# Copyright (c) 2026 CNES
 #
 # All rights reserved. Use of this source code is governed by a
 # BSD-style license that can be found in the LICENSE file.
 import pathlib
 
 import numpy
-import pyfes
-import pyfes.config as config_handler
 import pytest
+
+import pyfes
+
 
 DATASET = pathlib.Path(__file__).parent / 'dataset'
 
 
 def generate_coordinates():
-    lons = numpy.arange(-180, 180, 1)
-    lats = numpy.arange(-90, 90, 1)
+    lons = numpy.arange(-180, 180, 1, dtype=numpy.float64)
+    lats = numpy.arange(-90, 90, 1, dtype=numpy.float64)
     lons, lats = numpy.meshgrid(lons, lats)
     shape = lons.shape
     dates = numpy.full(shape, 'now', dtype='datetime64[us]')
@@ -22,11 +23,11 @@ def generate_coordinates():
 
 
 @pytest.mark.parametrize('bbox', [(-10, -10, 10, 10), (-20, -20, -10, -10)])
-def test_bbox_cartesian(tmp_path, bbox):
+def test_bbox_cartesian(tmp_path, bbox) -> None:
     """Test the configuration of the cartesian tide."""
     lons, lats, shape, dates = generate_coordinates()
 
-    config = f"""
+    settings = f"""
 tide:
     cartesian:
         paths:
@@ -46,25 +47,29 @@ tide:
             S1: {DATASET / 'S1_tide.nc'}
             S2: {DATASET / 'S2_tide.nc'}
 """
-    config_path = str(tmp_path / 'config.yaml')
-    with open(config_path, 'w', encoding='utf-8') as stream:
-        stream.write(config)
-    config = config_handler.load(config_path)
-    tide1, lp1, m1 = pyfes.evaluate_tide(config['tide'],
-                                         dates.ravel(),
-                                         lons.ravel(),
-                                         lats.ravel(),
-                                         num_threads=1)
+    settings_path = str(tmp_path / 'config.yaml')
+    with open(settings_path, 'w', encoding='utf-8') as stream:
+        stream.write(settings)
+    config = pyfes.config.load(settings_path)
+    tide1, lp1, m1 = pyfes.evaluate_tide(
+        config.models['tide'],
+        dates.ravel(),
+        lons.ravel(),
+        lats.ravel(),
+        settings=config.settings,
+    )
     tide1 = tide1.reshape(shape)
     lp1 = lp1.reshape(shape)
     m1 = (m1 > 0).reshape(shape)
 
-    config = config_handler.load(config_path, bbox)
-    tide2, lp2, m2 = pyfes.evaluate_tide(config['tide'],
-                                         dates.ravel(),
-                                         lons.ravel(),
-                                         lats.ravel(),
-                                         num_threads=1)
+    config = pyfes.config.load(settings_path, bbox)
+    tide2, lp2, m2 = pyfes.evaluate_tide(
+        config.models['tide'],
+        dates.ravel(),
+        lons.ravel(),
+        lats.ravel(),
+        settings=config.settings,
+    )
     tide2 = tide2.reshape(shape)
     lp2 = lp2.reshape(shape)
     m2 = (m2 > 0).reshape(shape)
@@ -78,14 +83,14 @@ tide:
 
 
 @pytest.mark.parametrize('bbox', [(-10, -10, 10, 10), (170, -10, 190, 10)])
-def test_bbox_lgp2(tmp_path, bbox):
+def test_bbox_lgp2(tmp_path, bbox) -> None:
     """Test the configuration of the lgp2 tide."""
     lon, lat, shape, dates = generate_coordinates()
 
-    config = f"""
+    settings = f"""
 tide:
     lgp:
-        path: {DATASET / "fes_2014.nc"}
+        path: {DATASET / 'fes_2014.nc'}
         codes: lgp2
         amplitude: "{{constituent}}_amp"
         phase: "{{constituent}}_phase"
@@ -98,24 +103,28 @@ tide:
             - Q1
             - S1
 """
-    config_path = str(tmp_path / 'config.yaml')
-    with open(config_path, 'w', encoding='utf-8') as stream:
-        stream.write(config)
+    settings_path = str(tmp_path / 'config.yaml')
+    with open(settings_path, 'w', encoding='utf-8') as stream:
+        stream.write(settings)
 
-    config = config_handler.load(config_path)
-    tide1, lp1, _ = pyfes.evaluate_tide(config['tide'],
-                                        dates.ravel(),
-                                        lon.ravel(),
-                                        lat.ravel(),
-                                        num_threads=0)
+    config = pyfes.config.load(settings_path)
+    tide1, lp1, _ = pyfes.evaluate_tide(
+        config.models['tide'],
+        dates.ravel(),
+        lon.ravel(),
+        lat.ravel(),
+        settings=config.settings,
+    )
     tide1 = tide1.reshape(shape)
     lp1 = lp1.reshape(shape)
-    config = config_handler.load(config_path, bbox)
-    tide2, lp2, _ = pyfes.evaluate_tide(config['tide'],
-                                        dates.ravel(),
-                                        lon.ravel(),
-                                        lat.ravel(),
-                                        num_threads=0)
+    config = pyfes.config.load(settings_path, bbox)
+    tide2, lp2, _ = pyfes.evaluate_tide(
+        config.models['tide'],
+        dates.ravel(),
+        lon.ravel(),
+        lat.ravel(),
+        settings=config.settings,
+    )
     tide2 = tide2.reshape(shape)
     lp2 = lp2.reshape(shape)
 

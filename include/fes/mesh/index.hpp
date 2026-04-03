@@ -1,4 +1,4 @@
-// Copyright (c) 2025 CNES
+// Copyright (c) 2026 CNES
 //
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
@@ -17,11 +17,11 @@
 #include "fes/geometry/ecef.hpp"
 #include "fes/geometry/point.hpp"
 #include "fes/geometry/triangle.hpp"
-#include "fes/string_view.hpp"
 
 namespace fes {
 namespace mesh {
 
+/// @brief Vertex attribute in a triangle.
 struct VertexAttribute {
   /// The vertex ID (0, 1, or 2) in the triangle.
   uint8_t vertex_id;
@@ -43,6 +43,9 @@ struct TriangleQueryResult {
   /// The selected triangle.
   geometry::Triangle triangle{};
   /// List of nearest vertices from triangles closest to the query point.
+  // Required to support the default constexpr constructor for queries where
+  // the point is inside the mesh and nearest vertices are not needed.
+  // NOLINTNEXTLINE (readability-redundant-member-init)
   std::vector<VertexAttribute> nearest_vertices{};
 
   /// Default constructor.
@@ -55,8 +58,8 @@ struct TriangleQueryResult {
   /// @param[in] point The point to be used to calculate the interpolation
   /// weights.
   /// @param[in] triangle The selected triangle.
-  inline TriangleQueryResult(const std::int32_t triangle_index,
-                             geometry::Point point, geometry::Triangle triangle)
+  TriangleQueryResult(const std::int32_t triangle_index,
+                      const geometry::Point& point, geometry::Triangle triangle)
       : index(triangle_index), point(point), triangle(std::move(triangle)) {}
 
   /// @brief Constructs a TriangleQueryResult when the query point is outside
@@ -64,10 +67,9 @@ struct TriangleQueryResult {
   /// @param nearest_vertices The nearest vertices from triangles closest to the
   /// query point.
   /// @param point The point to be used to calculate the interpolation weights.
-  inline TriangleQueryResult(std::vector<VertexAttribute> nearest_vertices,
-                             geometry::Point point)
-      : point(std::move(point)),
-        nearest_vertices(std::move(nearest_vertices)) {}
+  TriangleQueryResult(std::vector<VertexAttribute> nearest_vertices,
+                      const geometry::Point& point)
+      : point(point), nearest_vertices(std::move(nearest_vertices)) {}
 
   /// @brief Check if the requested point is inside the mesh.
   /// @return True if the point is inside the mesh, false otherwise.
@@ -75,7 +77,7 @@ struct TriangleQueryResult {
 
   /// @brief Check if the query is valid.
   /// @return True if the query is valid, false otherwise.
-  inline auto is_valid() const noexcept {
+  auto is_valid() const noexcept -> bool {
     return is_inside() || !nearest_vertices.empty();
   }
 };
@@ -98,14 +100,14 @@ class Index : public std::enable_shared_from_this<Index> {
   /// @param[in] point The point.
   /// @param[in] max_distance The maximum distance to the nearest triangle.
   /// @return The selected triangle.
-  auto search(const geometry::Point& point, const double max_distance) const
+  auto search(const geometry::Point& point, double max_distance) const
       -> TriangleQueryResult;
 
   /// Get the number of positions in the index
-  inline auto n_positions() const noexcept -> size_t { return lon_.size(); }
+  constexpr auto n_positions() const noexcept -> size_t { return lon_.size(); }
 
   /// Get the number of triangles in the index
-  inline auto n_triangles() const noexcept -> size_t {
+  constexpr auto n_triangles() const noexcept -> size_t {
     return triangles_.rows();
   }
 
@@ -128,26 +130,19 @@ class Index : public std::enable_shared_from_this<Index> {
   auto selected_triangles(const geometry::Box& bbox) const
       -> std::vector<int64_t>;
 
-  /// @brief Get a string representation of the index state.
-  ///
-  /// @return The string representation of the index state.
-  auto getstate() const -> std::string;
-
-  /// @brief Build an index from serialized state.
-  ///
-  /// @param[in] data The serialized state.
-  /// @return The index.
-  static auto setstate(const string_view& data) -> Index;
+  /// @brief Return the memory usage of the mesh index in bytes.
+  inline auto memory_usage() const -> size_t;
 
  private:
   /// Values stored in the R*Tree : Vertex of the triangle in ECEF coordinates,
   /// index of vertex (0, 1 or 2) and index of triangle.
-  using value_t =
+  using ValueType =
       std::pair<geometry::EarthCenteredEarthFixed, std::pair<int8_t, int32_t>>;
 
   /// R*Tree type
-  using rtree_t =
-      boost::geometry::index::rtree<value_t, boost::geometry::index::rstar<16>>;
+  using RTreeType =
+      boost::geometry::index::rtree<ValueType,
+                                    boost::geometry::index::rstar<16>>;
 
   /// The latitude coordinates of the mesh vertices.
   Eigen::VectorXd lon_;
@@ -159,30 +154,15 @@ class Index : public std::enable_shared_from_this<Index> {
   Eigen::Matrix<int32_t, -1, 3> triangles_;
 
   /// The R*Tree
-  rtree_t rtree_{};
+  RTreeType rtree_;
 
   /// Search the nearest triangles to a point in ECEF coordinates.
   inline auto nearest(const geometry::EarthCenteredEarthFixed& cartesian_point,
-                      const size_t max_neighbors) const
-      -> std::pair<std::set<int32_t>, double> {
-    auto triangle_indices = std::set<int>();
-    auto min_distance = std::numeric_limits<double>::max();
-    std::for_each(rtree_.qbegin(boost::geometry::index::nearest(cartesian_point,
-                                                                max_neighbors)),
-                  rtree_.qend(),
-                  [&cartesian_point, &min_distance,
-                   &triangle_indices](const auto& item) -> void {
-                    triangle_indices.emplace(item.second.second);
-                    min_distance = std::min(
-                        min_distance,
-                        boost::geometry::distance(cartesian_point, item.first));
-                  });
-    return std::make_pair(std::move(triangle_indices), min_distance);
-  }
+                      size_t max_neighbors) const
+      -> std::pair<std::set<int32_t>, double>;
 
   /// Build the selected triangle.
-  inline auto build_triangle(const int triangle_index) const
-      -> geometry::Triangle {
+  auto build_triangle(const int triangle_index) const -> geometry::Triangle {
     const Eigen::Vector3i& vertex_indices = triangles_.row(triangle_index);
     const auto i0 = vertex_indices(0);
     const auto i1 = vertex_indices(1);
@@ -196,21 +176,96 @@ class Index : public std::enable_shared_from_this<Index> {
   /// Filter the vertices of a triangle that are within a maximum distance from
   /// a given point.
   inline auto filter_nearby_vertices(
-      const geometry::EarthCenteredEarthFixed& point, const int triangle_index,
-      const double max_distance,
-      std::vector<VertexAttribute>& nearest_vertices) const -> void {
-    const Eigen::Vector3i& vertex_indices = triangles_.row(triangle_index);
-    for (uint8_t vertex_id = 0; vertex_id < 3; ++vertex_id) {
-      const auto vertex_index = vertex_indices(vertex_id);
-      const auto vertex = geometry::EarthCenteredEarthFixed(
-          geometry::Point(lon_(vertex_index), lat_(vertex_index)));
-      const auto distance = detail::geometry::distance(point, vertex);
-      if (distance <= max_distance) {
-        nearest_vertices.push_back({vertex_id, triangle_index});
-      }
+      const geometry::EarthCenteredEarthFixed& point, int triangle_index,
+      double max_distance, std::vector<VertexAttribute>& nearest_vertices) const
+      -> void;
+};
+
+auto Index::memory_usage() const -> size_t {
+  /// R*-tree maximum number of elements per node (rstar<16>)
+  constexpr size_t kMaxElementsPerNode = 16;
+
+  /// Size of pointer
+  constexpr size_t kPointerSize = sizeof(void*);
+
+  /// Total ValueType size
+  constexpr size_t kValueSize = sizeof(ValueType);
+
+  /// Size of a 3D bounding box
+  constexpr size_t kBoxSize = sizeof(geometry::Box);
+
+  /// Small structural overhead per node
+  /// (parent pointer, level, bookkeeping, alignment)
+  /// Approximation based on Boost implementation.
+  constexpr size_t kNodeHeaderSize = 64;
+
+  /// Leaf node payload:
+  /// each entry stores (Box + Value)
+  /// 48 + 32 = 80 bytes per entry
+  constexpr size_t kLeafEntrySize = kBoxSize + kValueSize;
+
+  /// Maximum leaf node size
+  constexpr size_t kLeafNodeSize =
+      kNodeHeaderSize + (kMaxElementsPerNode * kLeafEntrySize);
+
+  /// Internal node payload:
+  /// each entry stores (Box + child pointer)
+  /// 48 + 8 = 56 bytes per entry
+  constexpr size_t kInternalEntrySize = kBoxSize + kPointerSize;
+
+  /// Maximum internal node size
+  constexpr size_t kInternalNodeSize =
+      kNodeHeaderSize + (kMaxElementsPerNode * kInternalEntrySize);
+
+  // Rough estimation for rstar<16>
+  auto number_of_elements = rtree_.size();
+  size_t leaf_nodes = 0;
+  size_t internal_nodes = 0;
+  if (number_of_elements > 0) {
+    leaf_nodes =
+        (number_of_elements + kMaxElementsPerNode - 1) / kMaxElementsPerNode;
+    if (leaf_nodes > 1) {
+      internal_nodes =
+          (leaf_nodes + (kMaxElementsPerNode - 2)) / (kMaxElementsPerNode - 1);
     }
   }
-};
+  return (number_of_elements * kValueSize) + (leaf_nodes * kLeafNodeSize) +
+         (internal_nodes * kInternalNodeSize);
+}
+
+auto Index::nearest(const geometry::EarthCenteredEarthFixed& cartesian_point,
+                    const size_t max_neighbors) const
+    -> std::pair<std::set<int32_t>, double> {
+  auto triangle_indices = std::set<int>();
+  auto min_distance = std::numeric_limits<double>::max();
+  std::for_each(rtree_.qbegin(boost::geometry::index::nearest(cartesian_point,
+                                                              max_neighbors)),
+                rtree_.qend(),
+                [&cartesian_point, &min_distance,
+                 &triangle_indices](const auto& item) -> void {
+                  triangle_indices.emplace(item.second.second);
+                  min_distance = std::min(
+                      min_distance,
+                      boost::geometry::distance(cartesian_point, item.first));
+                });
+  return std::make_pair(std::move(triangle_indices), min_distance);
+}
+
+auto Index::filter_nearby_vertices(
+    const geometry::EarthCenteredEarthFixed& point, const int triangle_index,
+    const double max_distance,
+    std::vector<VertexAttribute>& nearest_vertices) const -> void {
+  const Eigen::Vector3i& vertex_indices = triangles_.row(triangle_index);
+  for (uint8_t vertex_id = 0; vertex_id < 3; ++vertex_id) {
+    const auto vertex_index = vertex_indices(vertex_id);
+    const auto vertex = geometry::EarthCenteredEarthFixed(
+        geometry::Point(lon_(vertex_index), lat_(vertex_index)));
+    const auto distance = detail::geometry::distance(point, vertex);
+    if (distance <= max_distance) {
+      nearest_vertices.push_back({vertex_id, triangle_index});
+    }
+  }
+}
 
 }  // namespace mesh
 }  // namespace fes

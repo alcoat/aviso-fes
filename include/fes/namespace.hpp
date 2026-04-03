@@ -1,7 +1,9 @@
-// Copyright (c) 2025 CNES
+// Copyright (c) 2026 CNES
 //
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
+/// @file fes/namespace.hpp
+/// @brief FES namespaces documentation.
 #pragma once
 
 // The purpose of this file is to group the documentation of the different C++
@@ -13,12 +15,6 @@ namespace fes {
 
 /// @brief Constants used in the FES library.
 namespace numbers {}
-
-/// @brief Astronomical angles.
-namespace angle {}
-
-/// @brief Computes the fundamental frequencies in the earth-moon-sun motion.
-namespace speed {}
 
 /// @brief Details of implementation.
 namespace detail {
@@ -59,7 +55,20 @@ namespace python {}
 /// @brief Types of tidal models used to interpolate the tidal components.
 namespace tidal_model {}
 
-/// @brief Manage and define tidal waves
-namespace wave {}
+/// @brief FES tidal model implementation.
+namespace darwin {
+
+/// @brief Darwin tidal model implementation details.
+namespace detail {}
+
+}  // namespace darwin
+
+/// @brief Perth5 tidal model implementation.
+namespace perth {
+
+/// @brief Perth tidal model implementation details.
+namespace detail {}
+
+}  // namespace perth
 
 }  // namespace fes

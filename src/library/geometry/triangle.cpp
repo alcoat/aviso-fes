@@ -1,4 +1,4 @@
-// Copyright (c) 2025 CNES
+// Copyright (c) 2026 CNES
 //
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
@@ -47,7 +47,7 @@ auto Triangle::reference_right_angled(const Point& point) const
   const auto cpx = p2 - p1;
   const auto cpy = p3 - p1;
 
-  auto jacobien = ctx * cpy - cty * cpx;
+  auto jacobien = (ctx * cpy) - (cty * cpx);
 
   if (detail::math::is_almost_zero(jacobien)) {
     return {0.0, 0.0};

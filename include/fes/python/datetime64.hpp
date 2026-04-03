@@ -1,4 +1,4 @@
-// Copyright (c) 2025 CNES
+// Copyright (c) 2026 CNES
 //
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
@@ -67,7 +67,7 @@ static inline auto npdatetime64_to_epoch(const pybind11::array& array)
   {
     pybind11::gil_scoped_release release;
     for (pybind11::ssize_t ix = 0; ix < ptr.size(); ++ix) {
-      result(ix) = ptr(ix) * scale;
+      result(ix) = static_cast<double>(ptr(ix)) * scale;
     }
   }
   return result;

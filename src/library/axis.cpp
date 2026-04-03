@@ -1,14 +1,36 @@
-// Copyright (c) 2025 CNES
+// Copyright (c) 2026 CNES
 //
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 #include "fes/axis.hpp"
 
-#include "fes/detail/isviewstream.hpp"
 #include "fes/detail/math.hpp"
-#include "fes/detail/serialize.hpp"
 
 namespace fes {
+
+Axis::Axis(const Eigen::Ref<const Eigen::VectorXd>& points,
+           const double epsilon, const bool is_longitude)
+    : is_longitude_(is_longitude),
+      period_(is_longitude ? detail::math::circle_degrees<double>() : 0.0) {
+  if (points.size() > std::numeric_limits<int64_t>::max()) {
+    throw std::invalid_argument(
+        "the size of the axis must not contain more than " +
+        std::to_string(std::numeric_limits<int64_t>::max()) + "elements.");
+  }
+
+  if (points.size() < 2) {
+    throw std::invalid_argument(
+        "the size of the axis must contain at least 2 elements.");
+  }
+  // If this is a longitude axis, normalize the points.
+  if (is_longitude_) {
+    auto normalized_values = Axis::normalize_longitude(points);
+    normalized_values ? initialize(*normalized_values, epsilon)
+                      : initialize(points, epsilon);
+  } else {
+    initialize(points);
+  }
+}
 
 auto Axis::is_evenly_spaced(const Eigen::Ref<const Eigen::VectorXd>& points)
     -> boost::optional<double> {
@@ -27,7 +49,7 @@ auto Axis::is_evenly_spaced(const Eigen::Ref<const Eigen::VectorXd>& points)
     return {};
   }
 
-  for (size_t ix = 1; ix < n; ++ix) {
+  for (int64_t ix = 1; ix < static_cast<int64_t>(n); ++ix) {
     if (!detail::math::is_same(points[ix] - points[ix - 1], increment, 1e-6)) {
       return {};
     }
@@ -40,7 +62,7 @@ auto Axis::normalize_longitude(const Eigen::VectorXd& points)
   auto monotonic = true;
   auto ascending = points.size() < 2 ? true : points[0] < points[1];
 
-  for (auto ix = Eigen::Index(1); ix < points.size(); ++ix) {
+  for (int64_t ix = 1; ix < points.size(); ++ix) {
     monotonic =
         ascending ? points[ix - 1] < points[ix] : points[ix - 1] > points[ix];
 
@@ -53,7 +75,7 @@ auto Axis::normalize_longitude(const Eigen::VectorXd& points)
     auto result = std::make_unique<Eigen::VectorXd>(points);
     auto cross = false;
 
-    for (Eigen::Index ix = 1; ix < result->size(); ++ix) {
+    for (int64_t ix = 1; ix < result->size(); ++ix) {
       if (!cross) {
         cross = ascending ? (*result)[ix - 1] > (*result)[ix]
                           : (*result)[ix - 1] < (*result)[ix];
@@ -81,13 +103,14 @@ auto Axis::initialize(const Eigen::Ref<const Eigen::VectorXd>& values,
 
   start_ = values[0];
   size_ = values.size();
-  step_ = size_ == 1 ? stop - start_ : (stop - start_) / (size_ - 1);
+  step_ = size_ == 1 ? stop - start_
+                     : (stop - start_) / static_cast<double>(size_ - 1);
 
   is_ascending_ = size_ < 2 ? true : (*this)(0) < (*this)(1);
 
-  if (is_circular_) {
-    is_circular_ =
-        detail::math::is_same(static_cast<double>(std::fabs(step_ * size_)),
+  if (is_longitude_) {
+    is_longitude_ =
+        detail::math::is_same(std::fabs(step_ * static_cast<double>(size_)),
                               detail::math::circle_degrees<double>(), epsilon);
   }
 }
@@ -105,9 +128,9 @@ auto Axis::find_indices(double coordinate) const
   /// If the value is outside the circle, then the value is between the last
   /// and first index.
   if (i0 == -1) {
-    return is_circular_ ? optional_t(std::make_tuple(
-                              static_cast<int64_t>(length - 1), 0LL))
-                        : optional_t();
+    return is_longitude_ ? optional_t(std::make_tuple(
+                               static_cast<int64_t>(length - 1), 0LL))
+                         : optional_t();
   }
 
   // Given the delta between the found coordinate and the given coordinate,
@@ -121,13 +144,13 @@ auto Axis::find_indices(double coordinate) const
     if (delta < 0) {
       // The found point is located after the coordinate provided.
       is_ascending_ ? --i0 : ++i0;
-      if (is_circular_) {
+      if (is_longitude_) {
         i0 = detail::math::remainder(i0, length);
       }
     } else {
       // The found point is located before the coordinate provided.
       is_ascending_ ? ++i1 : --i1;
-      if (is_circular_) {
+      if (is_longitude_) {
         i1 = detail::math::remainder(i1, length);
       }
     }
@@ -136,35 +159,6 @@ auto Axis::find_indices(double coordinate) const
     return std::make_tuple(i0, i1);
   }
   return boost::optional<std::tuple<int64_t, int64_t>>{};
-}
-
-auto Axis::getstate() const -> std::string {
-  auto ss = std::stringstream();
-  ss.exceptions(std::stringstream::failbit);
-  detail::serialize::write_data(ss, is_circular_);
-  detail::serialize::write_data(ss, circle_);
-  detail::serialize::write_data(ss, is_ascending_);
-  detail::serialize::write_data(ss, start_);
-  detail::serialize::write_data(ss, size_);
-  detail::serialize::write_data(ss, step_);
-  return ss.str();
-}
-
-auto Axis::setstate(const string_view& data) -> Axis {
-  detail::isviewstream ss(data);
-  ss.exceptions(std::stringstream::failbit);
-  try {
-    auto result = Axis();
-    result.is_circular_ = detail::serialize::read_data<bool>(ss);
-    result.circle_ = detail::serialize::read_data<double>(ss);
-    result.is_ascending_ = detail::serialize::read_data<bool>(ss);
-    result.start_ = detail::serialize::read_data<double>(ss);
-    result.size_ = detail::serialize::read_data<int64_t>(ss);
-    result.step_ = detail::serialize::read_data<double>(ss);
-    return result;
-  } catch (const std::ios_base::failure&) {
-    throw std::invalid_argument("invalid axis state");
-  }
 }
 
 }  // namespace fes

@@ -1,22 +1,21 @@
-// Copyright (c) 2025 CNES
+// Copyright (c) 2026 CNES
 //
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 /// @file include/fes/tidal_model/cartesian.hpp
 /// @brief Cartesian tidal model
 #pragma once
-#include <limits>
-#include <memory>
-#include <sstream>
+#include <cmath>
+#include <complex>
+#include <cstdint>
+#include <tuple>
 #include <utility>
-#include <vector>
 
-#include "fes/abstract_tidal_model.hpp"
 #include "fes/axis.hpp"
+#include "fes/constituent.hpp"
 #include "fes/detail/grid.hpp"
-#include "fes/detail/isviewstream.hpp"
-#include "fes/detail/serialize.hpp"
-#include "fes/string_view.hpp"
+#include "fes/detail/parallel_for.hpp"
+#include "fes/interface/tidal_model.hpp"
 
 namespace fes {
 namespace tidal_model {
@@ -25,7 +24,7 @@ namespace tidal_model {
 ///
 /// @tparam T The type of the tidal model.
 template <typename T>
-class Cartesian : public AbstractTidalModel<T> {
+class Cartesian : public TidalModelInterface<T> {
  public:
   /// Build a Cartesian tidal model from its grid properties.
   ///
@@ -33,19 +32,19 @@ class Cartesian : public AbstractTidalModel<T> {
   /// @param[in] lat The latitude axis.
   /// @param[in] tide_type The tide type handled by the model.
   /// @param[in] row_major Whether the data is stored in longitude-major order.
-  Cartesian(Axis lon, Axis lat, const TideType tide_type,
+  Cartesian(const Axis& lon, const Axis& lat, const TideType tide_type,
             const bool row_major = true)
-      : AbstractTidalModel<T>(tide_type),
+      : TidalModelInterface<T>(tide_type),
         row_major_(row_major),
-        lon_(std::move(lon)),
-        lat_(std::move(lat)) {}
+        lon_(lon),
+        lat_(lat) {}
 
   /// Add a tidal constituent to the model.
   ///
   /// @param[in] ident The tidal constituent identifier.
   /// @param[in] wave The tidal constituent modelled.
-  inline auto add_constituent(const Constituent ident,
-                              Vector<std::complex<T>> wave) -> void override {
+  auto add_constituent(const ConstituentId ident, Vector<std::complex<T>> wave)
+      -> void override {
     if (wave.size() != lon_.size() * lat_.size()) {
       throw std::invalid_argument("wave size does not match expected size");
     }
@@ -60,10 +59,11 @@ class Cartesian : public AbstractTidalModel<T> {
   /// angles are considered constant. The default value is 0 seconds, indicating
   /// that astronomical angles do not remain constant with time.
   /// @return A null pointer
-  constexpr auto accelerator(const angle::Formulae& formulae,
-                             const double time_tolerance) const
-      -> Accelerator* override {
-    return new Accelerator(formulae, time_tolerance, this->data_.size());
+  auto accelerator(const angle::Formulae& formulae,
+                   const double time_tolerance) const
+      -> std::unique_ptr<Accelerator> override {
+    return std::make_unique<Accelerator>(formulae, time_tolerance,
+                                         this->data_.size());
   }
 
   /// Interpolate the tidal model at a given point.
@@ -73,7 +73,7 @@ class Cartesian : public AbstractTidalModel<T> {
   /// @param[inout] acc The accelerator to use.
   /// @return The interpolated tidal model.
   auto interpolate(const geometry::Point& point, Quality& quality,
-                   Accelerator* acc) const -> const ConstituentValues& override;
+                   Accelerator& acc) const -> const ConstituentValues& override;
 
   /// Get the longitude axis.
   ///
@@ -85,119 +85,197 @@ class Cartesian : public AbstractTidalModel<T> {
   /// @return The latitude axis.
   constexpr auto lat() const noexcept -> const Axis& { return lat_; }
 
-  /// Serialize the tidal model.
-  ///
-  auto getstate() const -> std::string;
-
-  /// Deserialize the tidal model.
-  ///
-  /// @param[in] data The serialized tidal model.
-  /// @return The tidal model.
-  static auto setstate(const string_view& data) -> Cartesian<T>;
+  /// @brief Resample a tidal constituent wave to this model's grid using
+  /// bilinear interpolation.
+  /// @param[in] origin_lon The longitude axis of the original grid.
+  /// @param[in] origin_lat The latitude axis of the original grid.
+  /// @param[in] wave The wave to resample.
+  /// @param[in] row_major Whether the input wave is stored in longitude-major
+  /// order.
+  /// @param[in] num_threads The number of threads to use for resampling. If 0,
+  /// the number of threads is determined by the number of cores.
+  /// @return A vector containing the resampled wave on this model's grid.
+  auto resample(const Axis& origin_lon, const Axis& origin_lat,
+                const Vector<std::complex<T>>& wave, bool row_major = true,
+                size_t num_threads = 0) const -> Vector<std::complex<T>>;
 
  private:
+  /// @brief Type alias for Bilinear interpolation weights.
+  using Weights = std::tuple<double, double, double, double>;
+
+  /// Helper struct to hold interpolation context
+  struct InterpolationContext {
+    int64_t i1{};     //!< Index of the first longitude grid point.
+    int64_t i2{};     //!< Index of the second longitude grid point.
+    int64_t j1{};     //!< Index of the first latitude grid point.
+    int64_t j2{};     //!< Index of the second latitude grid point.
+    Weights weights;  //!< Bilinear interpolation weights (w11, w12, w21, w22).
+
+    /// @brief Check if the interpolation context is valid (i.e., the point is
+    /// within the grid boundaries).
+    /// @return True if the context is valid, false otherwise.
+    constexpr auto is_valid() const noexcept -> bool { return i1 >= 0; }
+  };
+
   /// Whether the data is stored in longitude-major order.
   bool row_major_;
   /// Longitude axis.
   Axis lon_;
   /// Latitude axis.
   Axis lat_;
+
+  /// @brief Computes the interpolation context for a given point, including
+  /// the indices of the surrounding grid points and the interpolation weights.
+  /// @param[in] lon The longitude of the point to interpolate at.
+  /// @param[in] lat The latitude of the point to interpolate at.
+  /// @return An InterpolationContext struct containing the indices, weights.
+  static inline auto prepare_interpolation(double lon, double lat,
+                                           const Axis& lon_axis,
+                                           const Axis& lat_axis)
+      -> InterpolationContext;
+
+  /// @brief Interpolates the value of a tidal constituent at a given point
+  /// using the provided interpolation context and grid data.
+  /// @tparam Grid The type of the grid containing the tidal constituent values.
+  /// @param[in] ctx The interpolation context containing indices and weights.
+  /// @param[in] grid The grid of tidal constituent values.
+  /// @param[inout] n A reference to an integer that will be updated with the
+  /// number of valid grid corners used in the interpolation (0, 1, 2, 3 or 4).
+  /// @return The interpolated value of the tidal constituent at the given
+  /// point.
+  template <typename Grid>
+  constexpr auto interpolate_value(const InterpolationContext& ctx,
+                                   const Grid& grid, int64_t& n) const
+      -> Complex;
 };
 
-// /////////////////////////////////////////////////////////////////////////////
+// ===========================================================================
+// Implementation
+// ===========================================================================
+
 template <typename T>
-auto Cartesian<T>::interpolate(const geometry::Point& point, Quality& quality,
-                               Accelerator* acc) const
-    -> const ConstituentValues& {
-  // Remove all previous values interpolated.
-  acc->clear();
-  // Find the nearest point in the grid
-  auto lon_index = lon_.find_indices(point.lon());
-  auto lat_index = lat_.find_indices(point.lat());
-
-  auto reset_values_to_undefined = [&]() -> const ConstituentValues& {
-    constexpr auto undefined_value =
-        std::complex<double>(std::numeric_limits<double>::quiet_NaN(),
-                             std::numeric_limits<double>::quiet_NaN());
-
-    for (const auto& item : this->data_) {
-      acc->emplace_back(item.first, undefined_value);
-    }
-    quality = kUndefined;
-    return acc->values();
-  };
+auto Cartesian<T>::prepare_interpolation(double lon, double lat,
+                                         const Axis& lon_axis,
+                                         const Axis& lat_axis)
+    -> InterpolationContext {
+  auto lon_index = lon_axis.find_indices(lon);
+  auto lat_index = lat_axis.find_indices(lat);
 
   if (!lon_index || !lat_index) {
-    return reset_values_to_undefined();
+    return {-1, 0, 0, 0, {}};
   }
 
-  int64_t i1;
-  int64_t i2;
-  int64_t j1;
-  int64_t j2;
+  int64_t i1{};
+  int64_t i2{};
+  int64_t j1{};
+  int64_t j2{};
   std::tie(i1, i2) = *lon_index;
   std::tie(j1, j2) = *lat_index;
-  const auto x1 = lon_(i1);
-  const auto x2 = lon_(i2);
-  const auto y1 = lat_(j1);
-  const auto y2 = lat_(j2);
-  auto n = int64_t{0};
 
-  auto wxy = detail::math::bilinear_weights(
-      detail::math::normalize_angle(point.lon(), x1), point.lat(), x1, y1,
-      detail::math::normalize_angle(x2, x1), y2);
+  auto weights = detail::math::bilinear_weights(
+      detail::math::normalize_angle(lon, lon_axis(i1)), lat, lon_axis(i1),
+      lat_axis(j1), detail::math::normalize_angle(lon_axis(i2), lon_axis(i1)),
+      lat_axis(j2));
+
+  return {i1, i2, j1, j2, weights};
+}
+
+// ===========================================================================
+
+template <typename T>
+template <typename Grid>
+constexpr auto Cartesian<T>::interpolate_value(const InterpolationContext& ctx,
+                                               const Grid& grid,
+                                               int64_t& n) const -> Complex {
+  return detail::math::bilinear_interpolation<Complex>(
+      std::get<0>(ctx.weights), std::get<1>(ctx.weights),
+      std::get<2>(ctx.weights), std::get<3>(ctx.weights), grid(ctx.i1, ctx.j1),
+      grid(ctx.i1, ctx.j2), grid(ctx.i2, ctx.j1), grid(ctx.i2, ctx.j2), n);
+}
+
+// ===========================================================================
+
+template <typename T>
+auto Cartesian<T>::interpolate(const geometry::Point& point, Quality& quality,
+                               Accelerator& acc) const
+    -> const ConstituentValues& {
+  // Remove all previous values interpolated.
+  acc.clear();
+
+  // Compute interpolation context (grid indices and weights).
+  const auto ctx = prepare_interpolation(point.lon(), point.lat(), lon_, lat_);
+
+  // Reset values to undefined, if the point is outside the grid boundaries or
+  // if any of the computed weights is NaN (not a number).
+  auto reset_values_to_undefined = [&]() -> const ConstituentValues& {
+    constexpr auto undefined_value =
+        detail::math::construct_nan<std::complex<double>>();
+
+    for (const auto& item : this->data_) {
+      acc.emplace_back(item.first, undefined_value);
+    }
+    quality = kUndefined;
+    return acc.values();
+  };
+
+  if (!ctx.is_valid()) {
+    return reset_values_to_undefined();
+  }
 
   auto grid = detail::Grid<std::complex<T>>(
       nullptr, static_cast<size_t>(lon_.size()),
       static_cast<size_t>(lat_.size()), row_major_);
+
+  auto n = int64_t{0};
   for (const auto& item : this->data_) {
     grid.data(item.second.data());
-    auto value = detail::math::bilinear_interpolation<std::complex<double>>(
-        std::get<0>(wxy), std::get<1>(wxy), std::get<2>(wxy), std::get<3>(wxy),
-        grid(i1, j1), grid(i1, j2), grid(i2, j1), grid(i2, j2), n);
+    auto value = interpolate_value(ctx, grid, n);
+
     // The computed value lies within the grid boundaries, but it is NaN (not a
     // number).
     if (std::isnan(value.real()) || std::isnan(value.imag())) {
       return reset_values_to_undefined();
     }
-    acc->emplace_back(item.first, value);
+    acc.emplace_back(item.first, value);
   }
   // n represents the number of valid grid corners used in the bilinear
   // interpolation (0, 1, 2, or 4).
   quality = static_cast<Quality>(n);
-  return acc->values();
+  return acc.values();
 }
 
 template <typename T>
-auto Cartesian<T>::getstate() const -> std::string {
-  auto ss = std::stringstream();
-  ss.exceptions(std::stringstream::failbit);
-  detail::serialize::write_data(ss, row_major_);
-  detail::serialize::write_string(ss, lon_.getstate());
-  detail::serialize::write_string(ss, lat_.getstate());
-  detail::serialize::write_data(ss, this->tide_type_);
-  detail::serialize::write_constituent_map(ss, this->data_);
-  return ss.str();
-}
-
-template <typename T>
-auto Cartesian<T>::setstate(const string_view& data) -> Cartesian<T> {
-  detail::isviewstream ss(data);
-  ss.exceptions(std::stringstream::failbit);
-  try {
-    auto row_major = detail::serialize::read_data<bool>(ss);
-    auto lon = Axis::setstate(detail::serialize::read_string(ss));
-    auto lat = Axis::setstate(detail::serialize::read_string(ss));
-    auto tide_type = detail::serialize::read_data<TideType>(ss);
-    auto model =
-        Cartesian<T>(std::move(lon), std::move(lat), tide_type, row_major);
-    model.data_ =
-        detail::serialize::read_constituent_map<Constituent, std::complex<T>>(
-            ss);
-    return model;
-  } catch (const std::exception&) {
-    throw std::invalid_argument("invalid tidal model state");
+auto Cartesian<T>::resample(const Axis& origin_lon, const Axis& origin_lat,
+                            const Vector<std::complex<T>>& wave,
+                            const bool row_major,
+                            const size_t num_threads) const
+    -> Vector<std::complex<T>> {
+  if (wave.size() != origin_lon.size() * origin_lat.size()) {
+    throw std::invalid_argument("wave size does not match expected size");
   }
+  const auto target_nx = lon_.size();
+  const auto target_ny = lat_.size();
+  const auto total = static_cast<size_t>(target_nx * target_ny);
+
+  auto resampled = Vector<std::complex<T>>(total);
+  const auto origin_grid = detail::Grid<std::complex<T>>(
+      wave.data(), static_cast<size_t>(origin_lon.size()),
+      static_cast<size_t>(origin_lat.size()), row_major);
+
+  auto thread = [&](const size_t start, const size_t end) -> void {
+    for (auto idx = start; idx < end; ++idx) {
+      int64_t n = 0;
+      const auto lon = lon_(row_major_ ? idx / target_ny : idx % target_nx);
+      const auto lat = lat_(row_major_ ? idx % target_ny : idx / target_nx);
+
+      auto ctx = prepare_interpolation(lon, lat, origin_lon, origin_lat);
+      resampled(static_cast<int64_t>(idx)) =
+          ctx.is_valid() ? interpolate_value(ctx, origin_grid, n)
+                         : detail::math::construct_nan<std::complex<T>>();
+    }
+  };
+  detail::parallel_for(thread, total, num_threads);
+  return resampled;
 }
 
 }  // namespace tidal_model

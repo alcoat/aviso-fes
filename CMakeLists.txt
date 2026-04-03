@@ -173,9 +173,19 @@ if(FES_ENABLE_COVERAGE)
   find_package(codecov)
 endif()
 
-# Find Eigen
-find_package(Eigen3 3.3.1 REQUIRED)
-include_directories(${EIGEN3_INCLUDE_DIR})
+# Find Eigen.
+find_package(Eigen3 5 CONFIG QUIET)
+if(NOT TARGET Eigen3::Eigen)
+  find_package(Eigen3 3.4.0 REQUIRED)
+endif()
+if(NOT EIGEN3_INCLUDE_DIR AND EIGEN3_INCLUDE_DIRS)
+  set(EIGEN3_INCLUDE_DIR ${EIGEN3_INCLUDE_DIRS})
+endif()
+if(NOT EIGEN3_INCLUDE_DIR AND TARGET Eigen3::Eigen)
+  get_target_property(EIGEN3_INCLUDE_DIR Eigen3::Eigen
+                      INTERFACE_INCLUDE_DIRECTORIES)
+endif()
+include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})
 
 # Find Google Test, if unit tests are enabled
 if(FES_ENABLE_TEST)
@@ -268,7 +278,7 @@ if(FES_BUILD_PYTHON_BINDINGS)
   include(ProcessorCount)
   ProcessorCount(NUM_CORES)
 
-  file(GLOB_RECURSE PYTHON_SOURCES "src/python/core/*.cpp")
+  file(GLOB_RECURSE PYTHON_SOURCES "src/core/*.cpp")
   pybind11_add_module(core ${PYTHON_SOURCES})
 
   if(FES_ENABLE_COVERAGE)
@@ -277,15 +287,21 @@ if(FES_BUILD_PYTHON_BINDINGS)
 
   target_link_libraries(core PRIVATE fes)
   message(STATUS ${CMAKE_CXX_COMPILER_ID})
-  if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-    set_property(
-      TARGET core
-      APPEND
-      PROPERTY COMPILE_OPTIONS -flto=${NUM_CORES})
-    set_property(
-      TARGET core
-      APPEND
-      PROPERTY LINK_OPTIONS -flto=${NUM_CORES})
+  if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    # Skip LTO if using Clang from conda (does not support Gold plugin)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER MATCHES
+                                                  "conda")
+      message(STATUS "Skipping LTO options for Clang from conda.")
+    else()
+      set_property(
+        TARGET core
+        APPEND
+        PROPERTY COMPILE_OPTIONS -flto=${NUM_CORES})
+      set_property(
+        TARGET core
+        APPEND
+        PROPERTY LINK_OPTIONS -flto=${NUM_CORES})
+    endif()
   elseif(MSVC)
     set_property(
       TARGET core
@@ -301,6 +317,30 @@ endif()
 if(FES_ENABLE_COVERAGE)
   list(APPEND LCOV_REMOVE_PATTERNS "'${CMAKE_CURRENT_SOURCE_DIR}/test/*'")
   coverage_evaluate()
+endif()
+
+# Try to find the prerequisites to compile the tide prediction example. If not
+# found, skip it without error.
+find_package(PkgConfig)
+if(PkgConfig_FOUND)
+  pkg_check_modules(NETCDF_CXX netcdf-cxx4)
+endif()
+if(NOT NETCDF_CXX_FOUND AND DEFINED ENV{CONDA_PREFIX})
+  set(NETCDF_CXX_INCLUDE_DIRS "$ENV{CONDA_PREFIX}/include")
+  find_library(
+    NETCDF_CXX_LIBRARIES
+    NAMES netcdf-cxx4 netcdf_c++4
+    HINTS "$ENV{CONDA_PREFIX}/lib")
+  if(NETCDF_CXX_LIBRARIES)
+    add_executable(tide_prediction
+                   ${CMAKE_CURRENT_SOURCE_DIR}/examples/prediction.cpp)
+    target_compile_features(tide_prediction PRIVATE cxx_std_20)
+    target_link_libraries(tide_prediction fes ${NETCDF_CXX_LIBRARIES}
+                          Boost::boost)
+    target_include_directories(
+      tide_prediction PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
+                              ${EIGEN3_INCLUDE_DIR} ${NETCDF_CXX_INCLUDE_DIRS})
+  endif()
 endif()
 
 message(STATUS "")

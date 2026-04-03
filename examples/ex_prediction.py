@@ -1,5 +1,4 @@
-"""
-******************
+"""******************
 Prediction example
 ******************
 
@@ -15,19 +14,38 @@ specific location, like a tide gauge.
 
 First, we import the required modules.
 """
+
 # %%
 from __future__ import annotations
 
 import os
 import pathlib
 
+from IPython.display import HTML
+import markdown
+import matplotlib.pyplot as plt
 import numpy
+
 import pyfes
 
+
 # %%
+# To display properly formatted markdown tables in this notebook, we define a
+# helper function that converts markdown strings to HTML.
+def md_to_html(md_string: str) -> HTML:
+    """Convert a markdown string to HTML for display in Jupyter."""
+    html_string = markdown.markdown(md_string, extensions=['tables'])
+    return HTML(html_string)
+
+
+# %%
+# Loading the model configuration
+# ===============================
+#
 # First we create an environment variable to store the path to the model file.
-os.environ['DATASET_DIR'] = str(pathlib.Path().absolute().parent / 'tests' /
-                                'python' / 'dataset')
+os.environ['DATASET_DIR'] = str(
+    pathlib.Path().absolute().parent / 'tests' / 'python' / 'dataset'
+)
 
 # %%
 # Now we need to create the instances of the model used to calculate the ocean
@@ -41,17 +59,12 @@ os.environ['DATASET_DIR'] = str(pathlib.Path().absolute().parent / 'tests' /
 #     `GitHub repository
 #     <https://github.com/CNES/aviso-fes/blob/main/examples/fes_slev.yml>`_.
 #
-handlers = pyfes.load_config(pathlib.Path().absolute() / 'fes_slev.yml')
-
-# %%
-# ``handlers`` is a dictionary that contains the handlers to the ocean and
-# radial tide models.
-print(handlers)
+config = pyfes.config.load(pathlib.Path().absolute() / 'fes_slev.yml')
 
 # %%
 # .. hint::
 #
-#     By default, the function :func:`pyfes.load_config` loads the entire
+#     By default, the function :func:`pyfes.config.load` loads the entire
 #     numeric grid into memory. To predict the tide for a specific region, you
 #     can use the ``bbox`` keyword argument to specify the region's bounding
 #     box. This bounding box is a tuple of four elements: minimum longitude,
@@ -59,44 +72,130 @@ print(handlers)
 #
 #     .. code-block:: python
 #
-#         handlers = pyfes.load_config('fes_slev.yaml', bbox=(-10, 40, 10, 60))
+#         config = pyfes.config.load('fes_slev.yaml', bbox=(-10, 40, 10, 60))
 #
-# Setup the longitude and latitude of the location where we want to calculate
-# the tide.
+# ``config`` is a :py:class:`~pyfes.config.Configuration` namedtuple that
+# contains the tidal models and the runtime settings loaded from the
+# configuration file.
+print(config)
+
+# %%
+# Prediction Engine Information
+# =============================
+#
+# This configuration uses the **FES/Darwin engine**, which employs Darwin's
+# harmonic notation with Schureman's nodal corrections. This is the classical
+# engine designed for FES tidal atlases.
+#
+# The Darwin engine:
+#
+# * Uses fundamental astronomical arguments (s, h, p, N, p₁)
+# * Applies individual Schureman nodal corrections to each constituent
+# * Supports 99 tidal constituents
+# * Uses traditional admittance for minor constituents
+#
+# To use the **PERTH/Doodson engine** instead (for GOT tidal models), set
+# ``engine: perth`` in your YAML configuration. The PERTH engine uses Doodson
+# number classification and group modulations. See the
+# `engine comparison example <ex_engine_comparison.html>`_ for details on
+# choosing between engines.
+
+print(f'\nRuntime Settings: {type(config.settings).__name__}')
+print('Engine: FES/Darwin (Schureman nodal corrections)')
+print(f'Astronomical formulae: {config.settings.astronomic_formulae}')
+print(f'Time tolerance: {config.settings.time_tolerance} seconds')
+
+# %%
+# Displaying the Configuration as a Markdown Table
+# =================================================
+#
+# You can generate a markdown table summarizing the engine settings and the
+# constituent list (modeled vs. inferred) using
+# :func:`pyfes.generate_markdown_table`. Pass the settings and the list
+# of modeled constituents to see which ones are provided by the atlas and which
+# ones will be inferred.
+md_to_html(
+    pyfes.generate_markdown_table(
+        config.settings,
+        modeled_constituents=config.models['tide'].identifiers(),
+    )
+)
+
+# %%
+# Generating the tide prediction
+# ==============================
+#
+# Set up the position and the dates where we want to calculate the tide.
 lon = -7.688
 lat = 59.195
 date = numpy.datetime64('1983-01-01T00:00:00')
 
 # %%
 # Generate the coordinates where we want to calculate the tide.
-dates = numpy.arange(date, date + numpy.timedelta64(1, 'D'),
-                     numpy.timedelta64(1, 'h'))
+dates = numpy.arange(
+    date, date + numpy.timedelta64(1, 'D'), numpy.timedelta64(1, 'h')
+)
 lons = numpy.full(dates.shape, lon)
 lats = numpy.full(dates.shape, lat)
 
 # %%
 # We can now calculate the ocean tide and the radial tide.
-tide, lp, _ = pyfes.evaluate_tide(handlers['tide'],
-                                  dates,
-                                  lons,
-                                  lats,
-                                  num_threads=1)
-load, load_lp, _ = pyfes.evaluate_tide(handlers['radial'],
-                                       dates,
-                                       lons,
-                                       lats,
-                                       num_threads=1)
+tide, lp, _ = pyfes.evaluate_tide(
+    config.models['tide'], dates, lons, lats, settings=config.settings
+)
+load, load_lp, _ = pyfes.evaluate_tide(
+    config.models['radial'], dates, lons, lats, settings=config.settings
+)
 
 # %%
-# Print the results
-cnes_julian_days = (dates - numpy.datetime64('1950-01-01T00:00:00')
-                    ).astype('M8[s]').astype(float) / 86400
+# Displaying the results
+# ======================
+#
+# Calculate CNES Julian Days (days since 1950-01-01).
+# This is the standard time reference used in CNES altimetry products.
+cnes_julian_days = (dates - numpy.datetime64('1950-01-01T00:00:00')).astype(
+    'M8[s]'
+).astype(float) / 86400
 hours = cnes_julian_days % 1 * 24
-print(f"{'JulDay':>6s} {'Hour':>5s} {'Latitude':>10s} {'Longitude':>10s} "
-      f"{'Short_tide':>10s} {'LP_tide':>10s} {'Pure_Tide':>10s} "
-      f"{'Geo_Tide':>10s} {'Rad_Tide':>10s}")
+print(
+    f'{"JulDay":>6s} {"Hour":>5s} {"Latitude":>10s} {"Longitude":>10s} '
+    f'{"Short_tide":>10s} {"LP_tide":>10s} {"Pure_Tide":>10s} '
+    f'{"Geo_Tide":>10s} {"Rad_Tide":>10s}'
+)
 print('=' * 89)
 for ix, jd in enumerate(cnes_julian_days):
-    print(f'{jd:>6.0f} {hours[ix]:>5.0f} {lats[ix]:>10.3f} {lons[ix]:>10.3f} '
-          f'{tide[ix]:>10.3f} {lp[ix]:>10.3f} {tide[ix] + lp[ix]:>10.3f} '
-          f'{tide[ix] + lp[ix] + load[ix]:>10.3f} {load[ix]:>10.3f}')
+    print(
+        f'{jd:>6.0f} {hours[ix]:>5.0f} {lats[ix]:>10.3f} {lons[ix]:>10.3f} '
+        f'{tide[ix]:>10.3f} {lp[ix]:>10.3f} {tide[ix] + lp[ix]:>10.3f} '
+        f'{tide[ix] + lp[ix] + load[ix]:>10.3f} {load[ix]:>10.3f}'
+    )
+
+# %%
+# Plot the tide components shown in the table. We recompute the tide only to
+# generate smoother curves on the figure below.
+dates = numpy.arange(
+    date, date + numpy.timedelta64(1, 'D'), numpy.timedelta64(1, 'm')
+)
+lons = numpy.full(dates.shape, lon)
+lats = numpy.full(dates.shape, lat)
+tide, lp, _ = pyfes.evaluate_tide(
+    config.models['tide'], dates, lons, lats, settings=config.settings
+)
+load, load_lp, _ = pyfes.evaluate_tide(
+    config.models['radial'], dates, lons, lats, settings=config.settings
+)
+
+pure_tide = tide + lp
+geo_tide = pure_tide + load
+
+plt.figure(figsize=(10, 5))
+plt.plot(dates, tide, label='Short tide')
+plt.plot(dates, lp, label='LP tide')
+plt.plot(dates, pure_tide, label='Pure tide')
+plt.plot(dates, geo_tide, label='Geo tide')
+plt.plot(dates, load, label='Rad tide')
+plt.title('Tide Components at Lon/Lat')
+plt.xlabel('Time')
+plt.ylabel('Meters')
+plt.legend()
+plt.tight_layout()

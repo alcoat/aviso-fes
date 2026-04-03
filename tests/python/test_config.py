@@ -1,46 +1,44 @@
-# Copyright (c) 2025 CNES
+# Copyright (c) 2026 CNES
 #
 # All rights reserved. Use of this source code is governed by a
 # BSD-style license that can be found in the LICENSE file.
 import pathlib
-import pickle
 
-import pyfes.config as config_handler
+import pyfes
+
 
 DATASET = pathlib.Path(__file__).parent / 'dataset'
 
 
-def test_config_cartesian(tmp_path):
+def test_config_cartesian(tmp_path) -> None:
     """Test the configuration of the cartesian tide."""
-    config = f"""
+    settings = f"""
 radial:
     cartesian:
         paths:
-            M2: {DATASET / "M2_tide.nc"}
-            K1: {DATASET / "K1_tide.nc"}
-            O1: {DATASET / "O1_tide.nc"}
-            P1: {DATASET / "P1_tide.nc"}
-            Q1: {DATASET / "Q1_tide.nc"}
-            S1: {DATASET / "S1_tide.nc"}
+            M2: {DATASET / 'M2_tide.nc'}
+            K1: {DATASET / 'K1_tide.nc'}
+            O1: {DATASET / 'O1_tide.nc'}
+            P1: {DATASET / 'P1_tide.nc'}
+            Q1: {DATASET / 'Q1_tide.nc'}
+            S1: {DATASET / 'S1_tide.nc'}
         dynamic:
             - A5
 """
-    config_path = str(tmp_path / 'config.yaml')
-    with open(config_path, 'w', encoding='utf-8') as stream:
-        stream.write(config)
-    config = config_handler.load(config_path)
-
-    other = pickle.loads(pickle.dumps(config))
-    assert config.keys() == other.keys()
-    assert config != other
+    settings_path = str(tmp_path / 'config.yaml')
+    with open(settings_path, 'w', encoding='utf-8') as stream:
+        stream.write(settings)
+    config = pyfes.config.load(settings_path)
+    assert 'radial' in config.models
+    assert isinstance(config.settings, pyfes.FESSettings)
 
 
-def test_config_lgp2(tmp_path):
+def test_config_lgp2(tmp_path) -> None:
     """Test the configuration of the lgp2 tide."""
-    config = f"""
+    settings = f"""
 tide:
     lgp:
-        path: {DATASET / "fes_2014.nc"}
+        path: {DATASET / 'fes_2014.nc'}
         codes: lgp2
         amplitude: "{{constituent}}_amp"
         phase: "{{constituent}}_phase"
@@ -55,11 +53,9 @@ tide:
         dynamic:
             - A5
 """
-    config_path = str(tmp_path / 'config.yaml')
-    with open(config_path, 'w', encoding='utf-8') as stream:
-        stream.write(config)
-    config = config_handler.load(config_path)
-
-    other = pickle.loads(pickle.dumps(config))
-    assert config.keys() == other.keys()
-    assert config != other
+    settings_path = str(tmp_path / 'config.yaml')
+    with open(settings_path, 'w', encoding='utf-8') as stream:
+        stream.write(settings)
+    config = pyfes.config.load(settings_path)
+    assert 'tide' in config.models
+    assert isinstance(config.settings, pyfes.FESSettings)

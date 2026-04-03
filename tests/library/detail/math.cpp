@@ -1,4 +1,4 @@
-// Copyright (c) 2025 CNES
+// Copyright (c) 2026 CNES
 //
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
@@ -12,7 +12,8 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-namespace math = fes::detail::math;
+namespace fes {
+namespace detail {
 
 TEST(Math, Pi) {
   // pi<double> == π
@@ -43,9 +44,9 @@ TEST(Math, Radians) {
   EXPECT_DOUBLE_EQ(math::radians(180.0), M_PI);
 }
 
-TEST(Math, Arcseconds) {
+TEST(Math, Arcseconds2Radians) {
   // arcseconds(3600) == π / 180
-  EXPECT_DOUBLE_EQ(math::arcseconds(3600.0), M_PI / 180.0);
+  EXPECT_DOUBLE_EQ(math::arcseconds2radians(3600.0), M_PI / 180.0);
 }
 
 TEST(Math, Degrees) {
@@ -177,3 +178,6 @@ TEST(Math, DegreesMinutesSecondesToDecialDegrees) {
   // 3600
   EXPECT_DOUBLE_EQ(math::dms_to_degrees<double>(1, 2, 3), 1.0341666666666667);
 }
+
+}  // namespace detail
+}  // namespace fes

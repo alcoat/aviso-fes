@@ -1,4 +1,4 @@
-// Copyright (c) 2025 CNES
+// Copyright (c) 2026 CNES
 //
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
@@ -8,7 +8,6 @@
 
 #include <boost/geometry.hpp>
 #include <ostream>
-#include <set>
 #include <sstream>
 #include <string>
 
@@ -16,11 +15,11 @@ namespace fes {
 namespace geometry {
 
 /// Base class for the Earth Centered Earth Fixed (ECEF) point.
-using ecef_t =
+using CartesianPoint3D =
     boost::geometry::model::point<double, 3, boost::geometry::cs::cartesian>;
 
 /// Earth Centered Earth Fixed (ECEF) point.
-class EarthCenteredEarthFixed : public ecef_t {
+class EarthCenteredEarthFixed : public CartesianPoint3D {
  public:
   /// Default constructor.
   EarthCenteredEarthFixed() = default;
@@ -31,7 +30,7 @@ class EarthCenteredEarthFixed : public ecef_t {
   /// @param[in] y The y coordinate.
   /// @param[in] z The z coordinate.
   constexpr EarthCenteredEarthFixed(double x, double y, double z)
-      : ecef_t(x, y, z) {}
+      : CartesianPoint3D(x, y, z) {}
 
   /// Get the x coordinate.
   constexpr auto x() const { return get<0>(); }
@@ -45,24 +44,24 @@ class EarthCenteredEarthFixed : public ecef_t {
   /// Set the x coordinate.
   ///
   /// @param[in] x The x coordinate.
-  inline auto x(const double x) { set<0>(x); }
+  auto x(const double x) { set<0>(x); }
 
   /// Set the y coordinate.
   ///
   /// @param[in] y The y coordinate.
-  inline auto y(const double y) { set<1>(y); }
+  auto y(const double y) { set<1>(y); }
 
   /// Set the z coordinate.
   ///
   /// @param[in] z The z coordinate.
-  inline auto z(const double z) { set<2>(z); }
+  auto z(const double z) { set<2>(z); }
 
   /// Write the ECEF point to a stream.
   friend auto operator<<(std::ostream& os, const EarthCenteredEarthFixed& ecef)
       -> std::ostream&;
 
   /// Convert the point to a string representation.
-  explicit inline operator std::string() const {
+  explicit operator std::string() const {
     auto ss = std::stringstream{};
     ss << *this;
     return ss.str();
@@ -71,7 +70,7 @@ class EarthCenteredEarthFixed : public ecef_t {
   /// Test if the point is equal to another point.
   /// @param[in] other The other point.
   /// @return True if the point is equal to the other point.
-  inline auto operator==(const EarthCenteredEarthFixed& other) const -> bool {
+  auto operator==(const EarthCenteredEarthFixed& other) const -> bool {
     return boost::geometry::equals(*this, other);
   }
 };

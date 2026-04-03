@@ -1,15 +1,24 @@
+// Copyright (c) 2026 CNES
+//
+// All rights reserved. Use of this source code is governed by a
+// BSD-style license that can be found in the LICENSE file.
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <complex>
 #include <iomanip>
 #include <iostream>
 #include <list>
+#include <map>
+#include <memory>
 #include <netcdf>
 #include <numbers>
 #include <tuple>
-#include <unordered_map>
 #include <vector>
 
+#include "fes/constituent.hpp"
+#include "fes/settings.hpp"
 #include "fes/tidal_model/cartesian.hpp"
 #include "fes/tidal_model/lgp.hpp"
 #include "fes/tide.hpp"
@@ -23,54 +32,118 @@
 // Define the ocean tide file path (LPG2)
 #define OCEAN_TIDE "path/to/fes2022_oceantide/fes2022b_lgp2.nc"
 
+/// @brief Convert a string to lower-case using ASCII case folding
+/// @param value Input string
+/// @return Lower-case string
+static auto to_lower(std::string value) -> std::string {
+  std::transform(
+      value.begin(), value.end(), value.begin(),
+      [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  return value;
+}
+
+/// @brief Resolve a NetCDF variable name with case-insensitive fallback
+/// @param ds Open NetCDF dataset
+/// @param expected_name Variable name expected by the code
+/// @return Actual variable name present in the dataset
+static auto resolve_variable_name(const netCDF::NcFile &ds,
+                                  const std::string &expected_name)
+    -> std::string {
+  if (!ds.getVar(expected_name).isNull()) {
+    return expected_name;
+  }
+
+  auto folded = to_lower(expected_name);
+  std::vector<std::string> matches;
+
+  for (const auto &item : ds.getVars()) {
+    if (to_lower(item.first) == folded) {
+      matches.push_back(item.first);
+    }
+  }
+
+  if (matches.size() == 1) {
+    std::cerr << "Warning: variable '" << expected_name
+              << "' not found exactly; using case-insensitive match '"
+              << matches.front() << "'." << std::endl;
+    return matches.front();
+  }
+
+  if (matches.size() > 1) {
+    std::string list;
+    for (size_t i = 0; i < matches.size(); ++i) {
+      if (i != 0) {
+        list += ", ";
+      }
+      list += "'" + matches[i] + "'";
+    }
+    throw std::runtime_error("Ambiguous variable name '" + expected_name +
+                             "'. Matches: " + list + ".");
+  }
+
+  throw std::runtime_error("Variable '" + expected_name +
+                           "' not found in the dataset.");
+}
+
 /// @brief Load tide paths for all constituents
 /// @return A map of constituent identifiers to their file paths
-static std::unordered_map<fes::Constituent, std::string> load_tide_paths() {
-  return {{fes::Constituent::k2N2, LOAD_TIDE("2n2.nc")},
-          {fes::Constituent::kEps2, LOAD_TIDE("eps2.nc")},
-          {fes::Constituent::kJ1, LOAD_TIDE("j1.nc")},
-          {fes::Constituent::kJ1, LOAD_TIDE("k1.nc")},
-          {fes::Constituent::kK2, LOAD_TIDE("k2.nc")},
-          {fes::Constituent::kL2, LOAD_TIDE("l2.nc")},
-          {fes::Constituent::kLambda2, LOAD_TIDE("lambda2.nc")},
-          {fes::Constituent::kM2, LOAD_TIDE("m2.nc")},
-          {fes::Constituent::kM3, LOAD_TIDE("m3.nc")},
-          {fes::Constituent::kM4, LOAD_TIDE("m4.nc")},
-          {fes::Constituent::kM6, LOAD_TIDE("m6.nc")},
-          {fes::Constituent::kM8, LOAD_TIDE("m8.nc")},
-          {fes::Constituent::kMf, LOAD_TIDE("mf.nc")},
-          {fes::Constituent::kMKS2, LOAD_TIDE("mks2.nc")},
-          {fes::Constituent::kMm, LOAD_TIDE("mm.nc")},
-          {fes::Constituent::kMN4, LOAD_TIDE("mn4.nc")},
-          {fes::Constituent::kMS4, LOAD_TIDE("ms4.nc")},
-          {fes::Constituent::kMSf, LOAD_TIDE("msf.nc")},
-          {fes::Constituent::kMSqm, LOAD_TIDE("msqm.nc")},
-          {fes::Constituent::kMtm, LOAD_TIDE("mtm.nc")},
-          {fes::Constituent::kMu2, LOAD_TIDE("mu2.nc")},
-          {fes::Constituent::kN2, LOAD_TIDE("n2.nc")},
-          {fes::Constituent::kN4, LOAD_TIDE("n4.nc")},
-          {fes::Constituent::kNu2, LOAD_TIDE("nu2.nc")},
-          {fes::Constituent::kO1, LOAD_TIDE("o1.nc")},
-          {fes::Constituent::kP1, LOAD_TIDE("p1.nc")},
-          {fes::Constituent::kQ1, LOAD_TIDE("q1.nc")},
-          {fes::Constituent::kR2, LOAD_TIDE("r2.nc")},
-          {fes::Constituent::kS1, LOAD_TIDE("s1.nc")},
-          {fes::Constituent::kS2, LOAD_TIDE("s2.nc")},
-          {fes::Constituent::kS4, LOAD_TIDE("s4.nc")},
-          {fes::Constituent::kSa, LOAD_TIDE("sa.nc")},
-          {fes::Constituent::kSsa, LOAD_TIDE("ssa.nc")},
-          {fes::Constituent::kT2, LOAD_TIDE("t2.nc")}};
+static auto load_tide_paths() -> std::map<fes::ConstituentId, std::string> {
+  return {{fes::ConstituentId::k2N2, LOAD_TIDE("2n2.nc")},
+          {fes::ConstituentId::kEps2, LOAD_TIDE("eps2.nc")},
+          {fes::ConstituentId::kJ1, LOAD_TIDE("j1.nc")},
+          {fes::ConstituentId::kK1, LOAD_TIDE("k1.nc")},
+          {fes::ConstituentId::kK2, LOAD_TIDE("k2.nc")},
+          {fes::ConstituentId::kL2, LOAD_TIDE("l2.nc")},
+          {fes::ConstituentId::kLambda2, LOAD_TIDE("lambda2.nc")},
+          {fes::ConstituentId::kM2, LOAD_TIDE("m2.nc")},
+          {fes::ConstituentId::kM3, LOAD_TIDE("m3.nc")},
+          {fes::ConstituentId::kM4, LOAD_TIDE("m4.nc")},
+          {fes::ConstituentId::kM6, LOAD_TIDE("m6.nc")},
+          {fes::ConstituentId::kM8, LOAD_TIDE("m8.nc")},
+          {fes::ConstituentId::kMf, LOAD_TIDE("mf.nc")},
+          {fes::ConstituentId::kMKS2, LOAD_TIDE("mks2.nc")},
+          {fes::ConstituentId::kMm, LOAD_TIDE("mm.nc")},
+          {fes::ConstituentId::kMN4, LOAD_TIDE("mn4.nc")},
+          {fes::ConstituentId::kMS4, LOAD_TIDE("ms4.nc")},
+          {fes::ConstituentId::kMSf, LOAD_TIDE("msf.nc")},
+          {fes::ConstituentId::kMSqm, LOAD_TIDE("msqm.nc")},
+          {fes::ConstituentId::kMtm, LOAD_TIDE("mtm.nc")},
+          {fes::ConstituentId::kMu2, LOAD_TIDE("mu2.nc")},
+          {fes::ConstituentId::kN2, LOAD_TIDE("n2.nc")},
+          {fes::ConstituentId::kN4, LOAD_TIDE("n4.nc")},
+          {fes::ConstituentId::kNu2, LOAD_TIDE("nu2.nc")},
+          {fes::ConstituentId::kO1, LOAD_TIDE("o1.nc")},
+          {fes::ConstituentId::kP1, LOAD_TIDE("p1.nc")},
+          {fes::ConstituentId::kQ1, LOAD_TIDE("q1.nc")},
+          {fes::ConstituentId::kR2, LOAD_TIDE("r2.nc")},
+          {fes::ConstituentId::kS1, LOAD_TIDE("s1.nc")},
+          {fes::ConstituentId::kS2, LOAD_TIDE("s2.nc")},
+          {fes::ConstituentId::kS4, LOAD_TIDE("s4.nc")},
+          {fes::ConstituentId::kSa, LOAD_TIDE("sa.nc")},
+          {fes::ConstituentId::kSsa, LOAD_TIDE("ssa.nc")},
+          {fes::ConstituentId::kT2, LOAD_TIDE("t2.nc")}};
 }
 
 /// @brief Get the ocean tide constituents to load
 /// @return A list of constituent identifiers
-static auto ocean_tide_constituents() -> std::list<fes::Constituent> {
-  return {fes::k2N2,     fes::kEps2, fes::kJ1,  fes::kK1,  fes::kK2, fes::kL2,
-          fes::kLambda2, fes::kM2,   fes::kM3,  fes::kM4,  fes::kM6, fes::kM8,
-          fes::kMKS2,    fes::kMN4,  fes::kMS4, fes::kMSf, fes::kMf, fes::kMm,
-          fes::kMSqm,    fes::kMtm,  fes::kMu2, fes::kN2,  fes::kN4, fes::kNu2,
-          fes::kO1,      fes::kP1,   fes::kQ1,  fes::kR2,  fes::kS1, fes::kS2,
-          fes::kS4,      fes::kSa,   fes::kSsa, fes::kT2};
+static auto ocean_tide_constituents() -> std::list<fes::ConstituentId> {
+  return {fes::ConstituentId::k2N2,     fes::ConstituentId::kEps2,
+          fes::ConstituentId::kJ1,      fes::ConstituentId::kK1,
+          fes::ConstituentId::kK2,      fes::ConstituentId::kL2,
+          fes::ConstituentId::kLambda2, fes::ConstituentId::kM2,
+          fes::ConstituentId::kM3,      fes::ConstituentId::kM4,
+          fes::ConstituentId::kM6,      fes::ConstituentId::kM8,
+          fes::ConstituentId::kMKS2,    fes::ConstituentId::kMN4,
+          fes::ConstituentId::kMS4,     fes::ConstituentId::kMSf,
+          fes::ConstituentId::kMf,      fes::ConstituentId::kMm,
+          fes::ConstituentId::kMSqm,    fes::ConstituentId::kMtm,
+          fes::ConstituentId::kMu2,     fes::ConstituentId::kN2,
+          fes::ConstituentId::kN4,      fes::ConstituentId::kNu2,
+          fes::ConstituentId::kO1,      fes::ConstituentId::kP1,
+          fes::ConstituentId::kQ1,      fes::ConstituentId::kR2,
+          fes::ConstituentId::kS1,      fes::ConstituentId::kS2,
+          fes::ConstituentId::kS4,      fes::ConstituentId::kSa,
+          fes::ConstituentId::kSsa,     fes::ConstituentId::kT2};
 }
 
 /// @brief Convert degrees to radians
@@ -78,7 +151,7 @@ static auto ocean_tide_constituents() -> std::list<fes::Constituent> {
 /// @param degrees Value in degrees
 /// @return Value in radians
 template <typename T>
-constexpr auto to_radians(const T& degrees) -> T {
+constexpr auto to_radians(const T &degrees) -> T {
   return degrees * std::numbers::pi / 180.0;
 }
 
@@ -86,7 +159,7 @@ constexpr auto to_radians(const T& degrees) -> T {
 /// @param amp Amplitude vector
 /// @param pha Phase vector in degrees
 /// @return A complex vector representing the wave
-auto polar(const std::vector<float>& amp, const std::vector<float>& pha)
+auto polar(const std::vector<float> &amp, const std::vector<float> &pha)
     -> Eigen::VectorXcf {
   auto size = amp.size();
   if (size != pha.size()) {
@@ -94,8 +167,10 @@ auto polar(const std::vector<float>& amp, const std::vector<float>& pha)
         "Amplitude and phase vectors must be of the same size.");
   }
   // Combine amplitude and phase into a complex wave
-  Eigen::Map<const Eigen::VectorXf> amp_map(amp.data(), size);
-  Eigen::Map<const Eigen::VectorXf> phase_map(pha.data(), size);
+  Eigen::Map<const Eigen::VectorXf> amp_map(amp.data(),
+                                            static_cast<Eigen::Index>(size));
+  Eigen::Map<const Eigen::VectorXf> phase_map(pha.data(),
+                                              static_cast<Eigen::Index>(size));
 
   return amp_map.binaryExpr(
       phase_map, [](float a, float p) { return std::polar(a, to_radians(p)); });
@@ -106,8 +181,8 @@ auto polar(const std::vector<float>& amp, const std::vector<float>& pha)
 /// @param filename The path to the NetCDF file
 /// @param model The tidal model to update
 static auto load_tide_data_from_file(
-    const fes::Constituent ident, const std::string& filename,
-    std::unique_ptr<fes::tidal_model::Cartesian<float>>& model) -> void {
+    const fes::ConstituentId ident, const std::string &filename,
+    std::unique_ptr<fes::tidal_model::Cartesian<float>> &model) -> void {
   try {
     // Open the NetCDF file for reading
     netCDF::NcFile ds(filename, netCDF::NcFile::read);
@@ -153,13 +228,15 @@ static auto load_tide_data_from_file(
       lat_var.getVar(lat.data());
 
       auto x_axis =
-          fes::Axis(Eigen::Map<const Eigen::VectorXd>(lon.data(), lon.size()),
+          fes::Axis(Eigen::Map<const Eigen::VectorXd>(
+                        lon.data(), static_cast<Eigen::Index>(lon.size())),
                     1e-6, true);
       auto y_axis =
-          fes::Axis(Eigen::Map<const Eigen::VectorXd>(lat.data(), lat.size()),
+          fes::Axis(Eigen::Map<const Eigen::VectorXd>(
+                        lat.data(), static_cast<Eigen::Index>(lat.size())),
                     1e-6, false);
-      model = std::move(std::make_unique<fes::tidal_model::Cartesian<float>>(
-          std::move(x_axis), std::move(y_axis), fes::TideType::kRadial, false));
+      model = std::make_unique<fes::tidal_model::Cartesian<float>>(
+          x_axis, y_axis, fes::TideType::kRadial, false);
     }
 
     // Combine amplitude and phase into a complex wave
@@ -167,8 +244,9 @@ static auto load_tide_data_from_file(
 
     // Finally, add the constituent to the model
     model->add_constituent(ident, std::move(wave));
-  } catch (netCDF::exceptions::NcException& e) {
-    std::cerr << "Error opening file: " << e.what() << std::endl;
+  } catch (netCDF::exceptions::NcException &e) {
+    std::cerr << "Error opening file: " << filename << " - " << e.what()
+              << std::endl;
     exit(EXIT_FAILURE);
   }
 }
@@ -180,7 +258,7 @@ static auto load_load_tide_model()
   auto tide_paths = load_tide_paths();
   std::unique_ptr<fes::tidal_model::Cartesian<float>> model = nullptr;
 
-  for (const auto& [ident, path] : tide_paths) {
+  for (const auto &[ident, path] : tide_paths) {
     load_tide_data_from_file(ident, path, model);
   }
   return model;
@@ -191,7 +269,7 @@ static auto load_load_tide_model()
 static auto load_ocean_tide_model()
     -> std::unique_ptr<fes::tidal_model::LGP2<float>> {
   try {
-    auto lpg2_model = std::make_unique<fes::tidal_model::LGP2<float>>();
+    auto lpg2_model = std::unique_ptr<fes::tidal_model::LGP2<float>>(nullptr);
     // Open the NetCDF file for reading
     netCDF::NcFile ds(OCEAN_TIDE, netCDF::NcFile::read);
 
@@ -216,10 +294,12 @@ static auto load_ocean_tide_model()
 
     // Create the mesh index
     auto index = std::make_shared<fes::mesh::Index>(
-        Eigen::Map<const Eigen::VectorXd>(lon.data(), lon.size()),
-        Eigen::Map<const Eigen::VectorXd>(lat.data(), lat.size()),
+        Eigen::Map<const Eigen::VectorXd>(
+            lon.data(), static_cast<Eigen::Index>(lon.size())),
+        Eigen::Map<const Eigen::VectorXd>(
+            lat.data(), static_cast<Eigen::Index>(lat.size())),
         Eigen::Map<const Eigen::Matrix<int32_t, -1, 3, Eigen::RowMajor>>(
-            triangles_data.data(), triangles, 3));
+            triangles_data.data(), static_cast<Eigen::Index>(triangles), 3));
 
     // Initialize the LGP2 model with the mesh index and LGP2 codes
     lpg2_model = std::make_unique<fes::tidal_model::LGP2<float>>(
@@ -230,9 +310,9 @@ static auto load_ocean_tide_model()
         fes::TideType::kTide, 100'000);
 
     // Read and add each constituent to the model
-    for (const auto& ident : ocean_tide_constituents()) {
+    for (const auto &ident : ocean_tide_constituents()) {
       std::string prefix = fes::constituents::name(ident);
-      std::string var_name = prefix + "_amplitude";
+      std::string var_name = resolve_variable_name(ds, prefix + "_amplitude");
 
       // Get the amplitude variable
       auto amp = ds.getVar(var_name);
@@ -245,7 +325,7 @@ static auto load_ocean_tide_model()
       amp.getVar(amplitude.data());
 
       // Get the phase variable
-      var_name = prefix + "_phase";
+      var_name = resolve_variable_name(ds, prefix + "_phase");
       auto phase = ds.getVar(var_name);
       if (phase.isNull()) {
         throw std::runtime_error("Variable " + var_name +
@@ -261,7 +341,7 @@ static auto load_ocean_tide_model()
     }
     return lpg2_model;
 
-  } catch (netCDF::exceptions::NcException& e) {
+  } catch (netCDF::exceptions::NcException &e) {
     std::cerr << "Error opening file: " << e.what() << std::endl;
     exit(EXIT_FAILURE);
   }
@@ -273,7 +353,9 @@ int main() {
   // Load the ocean tide model
   auto tide_handler = load_ocean_tide_model();
   // Create the FES settings
-  auto settings = fes::Settings{fes::angle::Formulae::kIERS, 0.0};
+  auto settings =
+      fes::FESSettings().with_num_threads(0).with_astronomic_formulae(
+          fes::angle::Formulae::kIERS);
   // Create a timeseries of dates starting from the first january 1983
   Eigen::VectorXd times(24);
   auto start_date = std::chrono::year{1983} / std::chrono::January / 1;
@@ -283,9 +365,6 @@ int main() {
     times[i] =
         std::chrono::duration<double>(current.time_since_epoch()).count();
   }
-  // Setup the leap seconds (TAI-UTC)
-  // In production, these should be set according to the dates
-  auto leap_seconds = Eigen::Vector<uint16_t, -1>::Constant(times.size(), 21);
 
   // Set the location (longitude, latitude) in degrees
   auto lon = Eigen::VectorXd::Constant(times.size(), -7.688);
@@ -293,16 +372,16 @@ int main() {
 
   // Evaluate the radial load tide (long period and interpolation quality are
   // ignored)
-  Eigen::VectorXd load = std::get<0>(fes::evaluate_tide(
-      radial_handler.get(), times, leap_seconds, lon, lat, settings));
+  Eigen::VectorXd load = std::get<0>(
+      fes::evaluate_tide(radial_handler.get(), times, lon, lat, settings));
 
   // Evaluate the ocean tide (interpolation quality is ignored here, but in
   // production you should check this to differentiate between interpolated and
   // extrapolated points)
   Eigen::VectorXd tide;
   Eigen::VectorXd lp;
-  std::tie(tide, lp, std::ignore) = fes::evaluate_tide(
-      tide_handler.get(), times, leap_seconds, lon, lat, settings);
+  std::tie(tide, lp, std::ignore) =
+      fes::evaluate_tide(tide_handler.get(), times, lon, lat, settings);
 
   // Print header with better formatting
   std::cout << "\n" << std::string(110, '=') << std::endl;
