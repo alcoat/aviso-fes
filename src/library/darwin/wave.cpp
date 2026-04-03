@@ -264,8 +264,8 @@ MK3::MK3()
            &angle::Astronomic::f_m2_k1) {}
 
 S3::S3()
-    : Wave(kS3, kShortPeriod, Darwin::Builder().T(3), &angle::Astronomic::f_m22) {
-}
+    : Wave(kS3, kShortPeriod, Darwin::Builder().T(3),
+           &angle::Astronomic::f_m22) {}
 
 N4::N4()
     : Wave(kN4, kShortPeriod,
