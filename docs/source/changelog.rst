@@ -3,6 +3,38 @@
 Changelog
 #########
 
+2026.5.2
+========
+
+**Note:** Version ``2026.5.2`` is an alias for ``2026.5.1``. The original
+``2026.5.1`` release was removed from PyPI due to an incorrect upload and
+cannot be republished under the same version number. ``2026.5.2`` is published
+with identical code and should be used in place of ``2026.5.1``.
+
+2026.5.1
+========
+
+Bug Fixes
+---------
+* Fixed Darwin wave cloning to preserve the dynamic wave type when copying
+  through ``WaveInterface`` pointers. The ``Wave::clone()`` implementation now
+  dispatches to a virtual ``clone_impl()`` helper, with overrides for derived
+  classes such as ``M1`` and ``L2`` so clones keep their concrete type instead
+  of being sliced to ``Wave``.
+
+2026.5.0
+========
+
+Performance
+-----------
+* Optimised the ``evaluate_tide`` hot path: faster wave-table indexing,
+  reduced per-call allocations, vectorised LPE arguments, zero-copy numpy
+  outputs from the Python bindings, and stack-allocated triangle storage
+  for the LGP2 mesh interpolation. Median wall-clock improvements versus
+  2026.4.0, measured on Apple Silicon (arm64): ~-25 % on small Cartesian
+  batches (10 k-100 k points), ~-5 % on the 1 M-point Cartesian case, and
+  ~-20 % to ~-30 % on LGP2 mesh interpolation across the same range.
+
 2026.4.0
 ========
 

@@ -145,45 +145,86 @@ def updated_astronomic_constants() -> AstronomicConstants:
     The "solar factor" (s) is the ratio of the tide-generating forces of the
     Sun and Moon, calculated as: s = (M_sun / M_moon) * (a_moon / a_sun)^3
     This is equivalent to (S/E) / (M/E) * (a_moon / AU)^3.
+
+    References
+    ----------
+    Petit, G. & Luzum, B. (eds.), *IERS Conventions (2010)*, IERS Technical
+        Note No. 36, Verlag des Bundesamts für Kartographie und Geodäsie,
+        Frankfurt am Main, 2010. ISBN 3-89888-989-6.
+        https://www.iers.org/IERS/EN/Publications/TechnicalNotes/tn36.html
+    Luzum, B., Capitaine, N., Fienga, A., et al. "The IAU 2009 system of
+        astronomical constants: the report of the IAU working group on
+        numerical standards for Fundamental Astronomy",
+        *Celestial Mechanics and Dynamical Astronomy*, 110, 293-304 (2011).
+        https://doi.org/10.1007/s10569-011-9352-4
+    IAU 2012 Resolution B2 (re-definition of the astronomical unit),
+        XXVIII General Assembly, Beijing.
+        https://www.iau.org/static/resolutions/IAU2012_English.pdf
+    Capitaine, N., Wallace, P. T. & Chapront, J., "Expressions for IAU 2000
+        precession quantities", *A&A* 412, 567-586 (2003).
+        https://doi.org/10.1051/0004-6361:20031539
+    Chapront-Touzé, M. & Chapront, J., "The lunar ephemeris ELP 2000",
+        *A&A* 124, 50-62 (1983).
     """
-    # Mass of Sun / Mass of Earth (S/E) from G*M_sun and G*M_earth
-    # IERS 2010 recommends using the geocentric gravitational constant (GE)
-    # and the heliocentric gravitational constant (GS). GS/GE = (S/E).
-    SE = 332946.0487  # This value is surprisingly stable and close to IERS.
+    # Mass of Sun / Mass of Earth (S/E) — μ in IERS 2010 Table 1.1.
+    # Derived from the heliocentric (GM_sun) and geocentric (GM_earth)
+    # gravitational constants: GM_sun / GM_earth.
+    # Source: IERS Conventions (2010), Table 1.1; IAU 2009 system
+    # (Luzum et al. 2011).
+    SE = 332946.0487
 
-    # Mass of Moon / Mass of Earth (M/E)
-    # IERS Conventions (2010), Table 1.1
-    ME = 0.0123000371  # This value is also very precise.
+    # Mass of Moon / Mass of Earth (M/E).
+    # Source: IERS Conventions (2010), Table 1.1; IAU 2009 system
+    # (Luzum et al. 2011).
+    ME = 0.0123000371
 
-    # Instead of parallaxes, modern conventions use the semi-major axes.
-    # Semi-major axis of lunar orbit (a_moon) in meters
-    # IERS Conventions (2010), Table 1.1
-    a_moon = 384402e3  # meters (Note: this is an average value)
+    # Semi-major axis of the lunar orbit (a_moon) in meters.
+    # Source: IERS Conventions (2010), Ch. 5 / JPL DE ephemerides; equivalent
+    # to the value used to derive Schureman's lunar equatorial parallax.
+    a_moon = 384399e3
 
-    # Astronomical Unit (a_sun or AU) in meters
-    # IERS Conventions (2010), a defining constant. IAU 2012 resolution.
-    AU = 149597870700.0  # meters
+    # Astronomical Unit (AU) in meters — exact by definition.
+    # Source: IAU 2012 Resolution B2 (Beijing); adopted by IERS.
+    AU = 149597870700.0
 
     # The ratio of tide-generating forces (Solar Factor 's')
     # s = (SE / ME) * (a_moon / AU)**3
     s = (SE / ME) * (a_moon / AU) ** 3
 
     return AstronomicConstants(
-        # Inclination of the mean lunar orbit to the mean ecliptic (I)
-        # IERS Conventions (2010), Chapter 5, eq. 5.76
-        i=math.radians(dms_to_deg(5, 8, 43.4)),  # 5.14539°
-        # Obliquity of the ecliptic for J2000.0 (ε)
-        # IERS Conventions (2010), Table 1.1
+        # Inclination of the mean lunar orbit to the mean ecliptic (I).
+        # Source: ELP2000 (Chapront-Touzé & Chapront 1983); IERS
+        # Conventions (2010), Ch. 5. 5°08'43.4″ ≈ 5.14539°.
+        i=math.radians(dms_to_deg(5, 8, 43.4)),
+        # Obliquity of the ecliptic at J2000.0 (ε).
+        # Source: IAU 2006 precession (Capitaine, Wallace & Chapront 2003);
+        # IERS Conventions (2010), eq. 5.39.
         w=math.radians(dms_to_deg(23, 26, 21.406)),
-        # Eccentricity of the Earth's mean orbit for J2000.0
-        # IERS Conventions (2010), Chapter 5
+        # Eccentricity of the Earth's mean orbit at J2000.0.
+        # Source: VSOP87 / IAU 2006 (Simon et al. 1994, A&A 282, 663);
+        # IERS Conventions (2010), Ch. 5.
         e1=0.016708634,
-        # Eccentricity of the Moon's mean orbit for J2000.0
-        # IERS Conventions (2010), Chapter 5
-        e=0.054900489,
-        # The calculated solar factor
+        # Eccentricity of the Moon's mean orbit.
+        # Source: ELP2000 (Chapront-Touzé & Chapront 1983); IERS
+        # Conventions (2010), Ch. 5.
+        e=0.0549006,
+        # The calculated solar factor.
         s=s,
     )
+
+
+# %%
+# Note on the parallaxes used by Schureman
+# ----------------------------------------
+# Schureman uses the solar (8.80″) and lunar equatorial (0°57'02.70″)
+# parallaxes directly. With the modern IERS 2010 / IAU 2012 lengths
+# (a_E = 6378136.6 m, AU = 149597870700 m, a_moon = 384399 km) these
+# become:
+#
+#   π_sun  = arcsin(a_E / AU)     ≈ 8.794143″
+#            (Luzum et al. 2011, IAU 2009 system)
+#   π_moon = arcsin(a_E / a_moon) ≈ 3422.6″ ≈ 0°57'02.6″
+#            (IERS Conventions 2010 / JPL DE ephemerides)
 
 
 # %%
@@ -304,12 +345,6 @@ f69 = round_to_4_decimal(
     * math.cos(0.5 * const.i) ** 4
 )
 print(f'f69 = {f69:.4f} (Schureman: 0.0164)')
-f69 = round_to_4_decimal(
-    math.sin(const.w)
-    * math.sin(0.5 * const.w) ** 2
-    * math.cos(0.5 * const.i) ** 4
-)
-print(f'f69 = {f69:.4f}')
 
 # %%
 # Formulae 70 & 78 (P. 25)
@@ -329,7 +364,7 @@ print(f'f69 = {f69:.4f}')
 f70 = round_to_4_decimal(
     math.cos(0.5 * const.w) ** 4 * math.cos(0.5 * const.i) ** 4
 )
-print(f'f70 = {f70:.4f}')
+print(f'f70 = {f70:.4f} (Schureman: 0.9154)')
 
 # %%
 # Formulae 71 & 79 (P. 25)
@@ -349,7 +384,7 @@ print(f'f70 = {f70:.4f}')
 f71 = round_to_4_decimal(
     math.sin(const.w) ** 2 * (1 - 3 / 2 * math.sin(const.i) ** 2)
 )
-print(f'f71 = {f71:.4f}')
+print(f'f71 = {f71:.4f} (Schureman: 0.1565)')
 
 # %%
 # Formulae 141 & 137 (P. 35, 36)
@@ -368,7 +403,7 @@ print(f'f71 = {f71:.4f}')
 #
 #   f(141) = \sin(I) - \frac{5}{4} \times \sin^3(I) / 0.3192
 f141 = round_to_4_decimal(math.sin(const.w) - 5 / 4 * math.sin(const.w) ** 3)
-print(f'f141 = {f141:.4f}')
+print(f'f141 = {f141:.4f} (Schureman: 0.3192)')
 
 # %%
 # Formulae 144 & 138 (P. 35, 36)
@@ -391,7 +426,7 @@ f144 = round_to_4_decimal(
     (1 - 10 * math.sin(0.5 * const.w) ** 2 + 15 * math.sin(0.5 * const.w) ** 4)
     * math.cos(0.5 * const.w) ** 2
 )
-print(f'f144 = {f144:.4f}')
+print(f'f144 = {f144:.4f} (Schureman: 0.5873)')
 
 # %%
 # Formulae 146 & 139 (P. 35, 36)
@@ -409,7 +444,7 @@ print(f'f144 = {f144:.4f}')
 #
 #     f(146) = \sin(I) \cos^4(\frac{1}{2}I) / 0.3658
 f146 = round_to_4_decimal(math.sin(const.w) * math.cos(0.5 * const.w) ** 4)
-print(f'f146 = {f146:.4f}')
+print(f'f146 = {f146:.4f} (Schureman: 0.3658)')
 
 # %%
 # Formulae 147 & 139 (P. 35, 36)
@@ -431,7 +466,7 @@ f147 = round_to_4_decimal(
     * math.sin(const.w)
     * math.cos(0.5 * const.w) ** 2
 )
-print(f'f147 = {f147:.4f}')
+print(f'f147 = {f147:.4f} (Schureman: 0.1114)')
 
 # %%
 # Formula 149 (P. 36)
@@ -449,7 +484,7 @@ print(f'f147 = {f147:.4f}')
 f149 = round_to_4_decimal(
     math.cos(0.5 * const.w) ** 6 * math.cos(0.5 * const.i) ** 6
 )
-print(f'f149 = {f149:.4f}')
+print(f'f149 = {f149:.4f} (Schureman: 0.8758)')
 
 # %%
 # Formula 197 (P. 41)
@@ -487,8 +522,8 @@ f197_1 = round_to_4_decimal(
 f197_2 = round_to_4_decimal(
     (3 / 2) * (math.cos(const.w) / math.cos(0.5 * const.w) ** 2)
 )
-print(f'f197_1 = {f197_1:.3f}')
-print(f'f197_2 = {f197_2:.3f}')
+print(f'f197_1 = {f197_1:.3f} (Schureman: 2.310)')
+print(f'f197_2 = {f197_2:.3f} (Schureman: 1.435)')
 
 # %%
 # Formulae 216-219 (P. 45)
@@ -531,10 +566,10 @@ f218 = round_to_4_decimal(1 / 2 + 3 / 4 * const.e**2)
 f219 = round_to_4_decimal(
     (1 / 2 + 3 / 4 * const.e1**2) * const.s * math.sin(const.w) ** 2
 )
-print(f'f216 = {f216:.4f}')
-print(f'f217 = {f217:.4f}')
-print(f'f218 = {f218:.4f}')
-print(f'f219 = {f219:.4f}')
+print(f'f216 = {f216:.4f} (Schureman: 0.5023)')
+print(f'f217 = {f217:.4f} (Schureman: 0.1681)')
+print(f'f218 = {f218:.4f} (Schureman: 0.5023)')
+print(f'f219 = {f219:.4f} (Schureman: 0.0365)')
 
 # %%
 # Formulae 224 (P. 45)
@@ -549,7 +584,7 @@ print(f'f219 = {f219:.4f}')
 #
 # where :math:`A = 0.5023 \sin(2I)` and :math:`B = 0.1681`.
 f224 = round_to_4_decimal(f217 / f216)
-print(f'f224 = {f224:.4f}')
+print(f'f224 = {f224:.4f} (Schureman: 0.3347)')
 
 # %%
 # Formula 226 (P. 45)
@@ -567,7 +602,7 @@ print(f'f224 = {f224:.4f}')
 #   = \left[0.5023 \sin(2I) \cos\nu + 0.1681\right]_0
 #   = 0.5305
 f226 = round_to_4_decimal(f216 * f68 + f217)
-print(f'f226 = {f226:.4f}')
+print(f'f226 = {f226:.4f} (Schureman: 0.5305)')
 
 # %%
 # Formula 227 (P. 45)
@@ -602,9 +637,9 @@ denominator = f226**2
 f227_1 = round_to_4_decimal(f216**2) / denominator
 f227_2 = round_to_4_decimal(f216 * f217 * 2) / denominator
 f227_3 = round_to_4_decimal(f217**2) / denominator
-print(f'{f227_1:.4f}')
-print(f'{f227_2:.4f}')
-print(f'{f227_3:.4f}')
+print(f'{f227_1:.4f} (Schureman: 0.8665)')
+print(f'{f227_2:.4f} (Schureman: 0.6001)')
+print(f'{f227_3:.4f} (Schureman: 0.1006)')
 
 # %%
 # Formulae 232 (P. 45)
@@ -619,7 +654,7 @@ print(f'{f227_3:.4f}')
 #
 # where :math:`A = 0.5023 \sin(2I)` and :math:`B = 0.0365`.
 f232 = round_to_4_decimal(f219 / f218)
-print(f'f232 = {f232:.4f}')
+print(f'f232 = {f232:.4f} (Schureman: 0.0727)')
 
 # %%
 # Formula 234 (P. 46)
@@ -636,7 +671,7 @@ print(f'f232 = {f232:.4f}')
 #
 #   \left[0.5023 \sin^2I \cos(2\nu) + 0.0365\right]_0 = 0.1151
 f234 = round_to_4_decimal(f218 * f71 + f219)
-print(f'f234 = {f234:.4f}')
+print(f'f234 = {f234:.4f} (Schureman: 0.1151)')
 
 # %%
 # Formula 235 (P. 46)
@@ -671,9 +706,9 @@ denominator = f234**2
 f235_1 = round_to_4_decimal(f218**2) / denominator
 f235_2 = round_to_4_decimal(f218 * f219 * 2) / denominator
 f235_3 = round_to_4_decimal(f219**2) / denominator
-print(f'{f235_1:.4f}')
-print(f'{f235_2:.4f}')
-print(f'{f235_3:.4f}')
+print(f'{f235_1:.4f} (Schureman: 19.0444)')
+print(f'{f235_2:.4f} (Schureman: 2.7702)')
+print(f'{f235_3:.4f} (Schureman: 0.0981)')
 
 # %%
 # Formulae from Page 156
@@ -687,8 +722,8 @@ print(f'{f235_3:.4f}')
 #   = 0.91370 - 0.03569\cos(N)
 cos_i_cos_w = math.cos(const.i) * math.cos(const.w)
 sin_i_sin_w = math.sin(const.i) * math.sin(const.w)
-print(f'cos(i) * cos(ω) = {cos_i_cos_w:.5f}')
-print(f'sin(i) * sin(ω) = {sin_i_sin_w:.5f}')
+print(f'cos(i) * cos(ω) = {cos_i_cos_w:.5f} (Schureman: 0.91370)')
+print(f'sin(i) * sin(ω) = {sin_i_sin_w:.5f} (Schureman: 0.03569)')
 # %%
 # .. math::
 #
@@ -699,7 +734,7 @@ print(f'sin(i) * sin(ω) = {sin_i_sin_w:.5f}')
 numerator = math.cos(0.5 * (const.w - const.i))
 denominator = math.cos(0.5 * (const.w + const.i))
 tan_coeff_1 = numerator / denominator
-print(f'{tan_coeff_1:.5f}')
+print(f'{tan_coeff_1:.5f} (Schureman: 1.01883)')
 
 # %%
 # .. math::
@@ -711,4 +746,4 @@ print(f'{tan_coeff_1:.5f}')
 numerator = math.sin(0.5 * (const.w - const.i))
 denominator = math.sin(0.5 * (const.w + const.i))
 tan_coeff_2 = numerator / denominator
-print(f'{tan_coeff_2:.5f}')
+print(f'{tan_coeff_2:.5f} (Schureman: 0.64412)')
